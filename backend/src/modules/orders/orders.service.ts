@@ -149,26 +149,30 @@ export class OrdersService {
     });
   }
 
-  async findAll(tenantId: string, opts: {
+  async findAll(tenantId: string | undefined, opts: {
     status?: OrderStatus; type?: OrderType; tableId?: string;
     waiterId?: string; cashierId?: string; clientId?: string;
     page?: number; limit?: number;
     dateFrom?: string; dateTo?: string;
   }) {
     const { status, type, tableId, waiterId, cashierId, clientId, page = 1, limit = 20, dateFrom, dateTo } = opts;
+
+    if (!tenantId && !clientId) return { data: [], total: 0, page, limit, totalPages: 0 };
+
     const query = this.orderRepo.createQueryBuilder('o')
       .leftJoinAndSelect('o.items', 'items')
       .leftJoinAndSelect('o.table', 'table')
       .leftJoinAndSelect('o.waiter', 'waiter')
       .leftJoinAndSelect('o.client', 'client')
-      .where('o.tenantId = :tenantId', { tenantId });
+      .where('1=1');
 
+    if (tenantId) query.andWhere('o.tenantId = :tenantId', { tenantId });
+    if (clientId) query.andWhere('o.clientId = :clientId', { clientId });
     if (status) query.andWhere('o.status = :status', { status });
     if (type) query.andWhere('o.type = :type', { type });
     if (tableId) query.andWhere('o.tableId = :tableId', { tableId });
     if (waiterId) query.andWhere('o.waiterId = :waiterId', { waiterId });
     if (cashierId) query.andWhere('o.cashierId = :cashierId', { cashierId });
-    if (clientId) query.andWhere('o.clientId = :clientId', { clientId });
     if (dateFrom) query.andWhere('o.createdAt >= :dateFrom', { dateFrom });
     if (dateTo) query.andWhere('o.createdAt <= :dateTo', { dateTo });
 

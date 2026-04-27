@@ -61,7 +61,7 @@ export default function ClientPlacesPage() {
   const [myOrders, setMyOrders] = useState<any[]>([]);
   const pollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* ── Load tenants + ratings ── */
+  /* ── Load tenants + ratings, then check for active session ── */
   useEffect(() => {
     publicApi.getTenants().then(async (res) => {
       const list = (() => { const r = res?.data?.data ?? res?.data; return Array.isArray(r) ? r : []; })();
@@ -75,6 +75,26 @@ export default function ClientPlacesPage() {
         } catch {}
       }));
       setRatings(map);
+
+      /* ── Restore active session if exists ── */
+      try {
+        const oRes = await ordersApi.getAll({ limit: 50 });
+        const raw = oRes?.data?.data?.data ?? oRes?.data?.data ?? oRes?.data;
+        const allOrders: any[] = Array.isArray(raw) ? raw : [];
+        const active = allOrders.filter(o =>
+          o.tableId &&
+          !['completed', 'cancelled'].includes(o.status) &&
+          o.table && o.table.status !== 'free'
+        );
+        if (active.length > 0) {
+          const firstOrder = active[0];
+          const matchedTenant = list.find((t: any) => t.id === firstOrder.tenantId);
+          const tbl = firstOrder.table;
+          if (matchedTenant && tbl) {
+            await startSession(matchedTenant, tbl, active);
+          }
+        }
+      } catch {}
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -107,24 +127,32 @@ export default function ClientPlacesPage() {
     finally { setTablesLoading(false); }
   };
 
-  /* ── Open table → load menu → start session ── */
-  const openTable = async () => {
-    if (!table) return;
+  /* ── Core: start/resume session ── */
+  const startSession = async (t: any, tbl: any, existingOrders: any[] = []) => {
+    setTenant(t);
+    setTable(tbl);
     setMenuLoading(true);
     setStep('session');
     setCart([]);
-    setMyOrders([]);
-    setTab('menu');
+    setMyOrders(existingOrders);
+    setTab(existingOrders.length > 0 ? 'orders' : 'menu');
     try {
-      const res = await menuApi.getMenu(tenant.slug);
+      const res = await menuApi.getMenu(t.slug);
       setMenu(res.data?.data ?? res.data);
       setActiveCat('all');
     } catch { toast.error('Menyu yuklanmadi'); }
     finally { setMenuLoading(false); }
 
+    if (pollerRef.current) clearInterval(pollerRef.current);
     pollerRef.current = setInterval(() => {
       setMyOrders(prev => { pollOrders(prev); return prev; });
     }, 6000);
+  };
+
+  /* ── Open new table (from table picker) ── */
+  const openTable = () => {
+    if (!table || !tenant) return;
+    startSession(tenant, table, []);
   };
 
   /* ── Cart helpers ── */
