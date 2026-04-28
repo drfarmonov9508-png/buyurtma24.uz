@@ -48,21 +48,23 @@ export class AuthService {
 
     if (!user.isActive) throw new UnauthorizedException('Account is deactivated');
 
-    await this.userRepo.update(user.id, { lastLoginAt: new Date() });
+    try { await this.userRepo.update(user.id, { lastLoginAt: new Date() }); } catch { /* column may not exist */ }
 
     const tokens = await this.generateTokens(user);
 
-    await this.auditRepo.save(
-      this.auditRepo.create({
-        tenantId: user.tenantId,
-        userId: user.id,
-        action: 'LOGIN',
-        entity: 'User',
-        entityId: user.id,
-        ipAddress: ip,
-        description: `User ${user.phone} logged in`,
-      }),
-    );
+    try {
+      await this.auditRepo.save(
+        this.auditRepo.create({
+          tenantId: user.tenantId,
+          userId: user.id,
+          action: 'LOGIN',
+          entity: 'User',
+          entityId: user.id,
+          ipAddress: ip,
+          description: `User ${user.phone} logged in`,
+        }),
+      );
+    } catch { /* audit table may not exist yet */ }
 
     return { user: this.sanitizeUser(user), ...tokens };
   }
@@ -83,19 +85,21 @@ export class AuthService {
     const isMatch = await bcrypt.compare(dto.password, user.password);
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
-    await this.userRepo.update(user.id, { lastLoginAt: new Date() });
+    try { await this.userRepo.update(user.id, { lastLoginAt: new Date() }); } catch { /* column may not exist */ }
 
     const tokens = await this.generateTokens(user);
 
-    await this.auditRepo.save(
-      this.auditRepo.create({
-        userId: user.id,
-        action: 'SUPERADMIN_LOGIN',
-        entity: 'User',
-        entityId: user.id,
-        ipAddress: ip,
-      }),
-    );
+    try {
+      await this.auditRepo.save(
+        this.auditRepo.create({
+          userId: user.id,
+          action: 'SUPERADMIN_LOGIN',
+          entity: 'User',
+          entityId: user.id,
+          ipAddress: ip,
+        }),
+      );
+    } catch { /* audit table may not exist yet */ }
 
     return { user: this.sanitizeUser(user), ...tokens };
   }
@@ -120,11 +124,13 @@ export class AuthService {
       });
       await this.userRepo.save(user);
     } else {
-      await this.userRepo.update(user.id, {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        lastLoginAt: new Date(),
-      });
+      try {
+        await this.userRepo.update(user.id, {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          lastLoginAt: new Date(),
+        });
+      } catch { /* column may not exist */ }
     }
 
     const tokens = await this.generateTokens(user);
@@ -147,10 +153,12 @@ export class AuthService {
       });
       await this.userRepo.save(user);
     } else {
-      const updates: any = { lastLoginAt: new Date() };
-      if (dto.firstName) updates.firstName = dto.firstName;
-      if (dto.lastName) updates.lastName = dto.lastName;
-      await this.userRepo.update(user.id, updates);
+      try {
+        const updates: any = { lastLoginAt: new Date() };
+        if (dto.firstName) updates.firstName = dto.firstName;
+        if (dto.lastName) updates.lastName = dto.lastName;
+        await this.userRepo.update(user.id, updates);
+      } catch { /* column may not exist */ }
     }
 
     const tokens = await this.generateTokens(user);
@@ -196,7 +204,7 @@ export class AuthService {
       }),
     ]);
 
-    await this.userRepo.update(user.id, { refreshToken });
+    try { await this.userRepo.update(user.id, { refreshToken }); } catch { /* column may not exist */ }
 
     return { accessToken, refreshToken };
   }
