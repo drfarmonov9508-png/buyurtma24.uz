@@ -130,6 +130,7 @@ export const reportsApi = {
   getTopProducts: (params?: any) => api.get('/v1/reports/top-products', { params }),
   getWaiterPerformance: (params?: any) => api.get('/v1/reports/waiter-performance', { params }),
   getPeakHours: () => api.get('/v1/reports/peak-hours'),
+  getCancellations: () => api.get('/v1/reports/cancellations'),
 };
 
 export const subscriptionsApi = {
