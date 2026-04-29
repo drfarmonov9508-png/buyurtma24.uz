@@ -47,6 +47,7 @@ import databaseConfig from './config/database.config';
         migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
         synchronize: config.get('NODE_ENV') === 'development' || config.get('DB_SYNC') === 'true',
         migrationsRun: config.get('NODE_ENV') === 'production',
+        migrationsTransactionMode: 'none',
         dropSchema: config.get('DB_DROP_SCHEMA') === 'true',
         logging: config.get('NODE_ENV') === 'development',
         ssl: config.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
