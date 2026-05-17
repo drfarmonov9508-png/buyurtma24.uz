@@ -87,11 +87,14 @@ export const billiardApi = {
   createTable: (data: any) => api.post('/v1/billiard/admin/tables', data),
   createExtra: (data: any) => api.post('/v1/billiard/admin/extras', data),
   updateExtra: (id: string, data: any) => api.patch(`/v1/billiard/admin/extras/${id}`, data),
+  deleteExtra: (id: string) => api.delete(`/v1/billiard/admin/extras/${id}`),
   openTable: (id: string) => api.post(`/v1/billiard/admin/tables/${id}/open`),
   getAnalytics: () => api.get('/v1/billiard/admin/analytics'),
   confirmOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/confirm`),
   addOrderItem: (id: string, data: any) => api.post(`/v1/billiard/orders/${id}/items`, data),
   acknowledgeItem: (id: string) => api.post(`/v1/billiard/items/${id}/acknowledge`),
+  cancelOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/cancel`),
+  cancelItem: (id: string) => api.post(`/v1/billiard/orders/items/${id}/cancel`),
   closeOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/close`),
 };
 

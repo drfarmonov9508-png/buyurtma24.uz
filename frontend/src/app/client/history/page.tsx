@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { clientApi } from '@/lib/api';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
@@ -24,6 +25,8 @@ function minutesText(order: any) {
 }
 
 export default function ClientHistoryPage() {
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const { data, isLoading } = useQuery({
     queryKey: ['client-history'],
     queryFn: () => clientApi.getHistory({ limit: 80 }).then((r) => r.data),
@@ -34,6 +37,21 @@ export default function ClientHistoryPage() {
     return Array.isArray(r) ? r : [];
   })();
 
+  const filteredEntries = useMemo(() => {
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
+    return entries.filter((entry: any) => {
+      const entryDate = new Date(entry.closedAt || entry.confirmedAt || entry.createdAt || '');
+      if (from && entryDate < from) return false;
+      if (to) {
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate > end) return false;
+      }
+      return true;
+    });
+  }, [entries, fromDate, toDate]);
+
   return (
     <div className="max-w-4xl space-y-6">
       <div>
@@ -41,21 +59,32 @@ export default function ClientHistoryPage() {
           <History size={24} /> Ilova tarixi
         </h1>
         <p className="mt-1 text-gray-500">Bu raqam orqali restoran, supermarket va billiarddagi barcha harakatlar</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block">
+            <span className="label">Boshlanish sanasi</span>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="input rounded-2xl" />
+          </label>
+          <label className="block">
+            <span className="label">Tugash sanasi</span>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="input rounded-2xl" />
+          </label>
+          <button onClick={() => { setFromDate(''); setToDate(''); }} className="btn-ghost rounded-2xl px-4 py-3">Filtrni tozalash</button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-gray-400">
           <Loader2 className="animate-spin" size={22} /> Yuklanmoqda...
         </div>
-      ) : entries.length === 0 ? (
+      ) : filteredEntries.length === 0 ? (
         <div className="card p-12 text-center">
           <Package size={48} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-lg font-medium text-gray-500">Hali tarix yo'q</p>
-          <p className="mt-1 text-sm text-gray-400">Ilovadan foydalanganingizda hammasi shu yerda ko‘rinadi</p>
+          <p className="text-lg font-medium text-gray-500">Filtrlangan natija bo'yicha yozuvlar topilmadi</p>
+          <p className="mt-1 text-sm text-gray-400">Tanlangan sanalar orasida hech qanday tarix yo‘q.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {entries.map((entry: any) => entry.historyType === 'billiard' ? (
+          {filteredEntries.map((entry: any) => entry.historyType === 'billiard' ? (
             <BilliardHistoryCard key={`billiard-${entry.id}`} order={entry} />
           ) : (
             <FoodHistoryCard key={`food-${entry.id}`} order={entry} />

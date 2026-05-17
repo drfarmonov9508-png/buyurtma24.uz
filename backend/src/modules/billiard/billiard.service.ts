@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
+import { UserRole } from '../../common/enums/role.enum';
 import { BilliardClub } from './billiard-club.entity';
 import { BilliardTable, BilliardTableStatus } from './billiard-table.entity';
 import { BilliardOrder, BilliardOrderStatus } from './billiard-order.entity';
@@ -149,6 +150,16 @@ export class BilliardService {
     return saved;
   }
 
+  async deleteExtra(tenantId: string, extraId: string) {
+    const club = await this.findAdminClub(tenantId);
+    const extra = await this.extraRepo.findOne({ where: { id: extraId, clubId: club.id } });
+    if (!extra) throw new NotFoundException('Ombor mahsuloti topilmadi');
+    extra.isActive = false;
+    const deleted = await this.extraRepo.save(extra);
+    this.gateway.emitClub(club.id, 'inventory-updated', deleted);
+    return { message: 'Mahsulot o‘chirildi' };
+  }
+
   async findExtras(clubId: string) {
     return this.extraRepo.find({ where: { clubId, isActive: true }, order: { name: 'ASC' } });
   }
@@ -210,7 +221,7 @@ export class BilliardService {
     table.status = BilliardTableStatus.RESERVED;
     await this.tableRepo.save(table);
     const saved = await this.orderRepo.save(order);
-    this.gateway.emitClub(club.id, 'booking-requested', saved);
+    this.gateway.emitClub(club.id, 'booking-requested', { order: saved, table });
     this.gateway.emitClub(club.id, 'table-updated', table);
     return saved;
   }
@@ -318,10 +329,13 @@ export class BilliardService {
   }
 
   // Close order: calculate final total and free the table
-  async closeOrder(orderId: string) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table'] });
+  async closeOrder(orderId: string, actorId: string, actorRole: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table', 'user'] });
     if (!order) throw new NotFoundException('Order not found');
     if (order.status === BilliardOrderStatus.COMPLETED) throw new BadRequestException('Order already closed');
+    if (actorRole !== UserRole.BILLIARD_ADMIN && actorRole !== UserRole.SUPERADMIN && actorId !== order.userId) {
+      throw new ForbiddenException('You are not allowed to close this order');
+    }
 
     // compute price for duration
     const closedAt = new Date();
@@ -352,6 +366,39 @@ export class BilliardService {
     return { order, items, finalTotal };
   }
 
+  async cancelOrder(orderId: string, actorId: string, actorRole: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table', 'user'] });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status !== BilliardOrderStatus.PENDING) throw new BadRequestException('Only pending orders can be cancelled');
+    if (actorRole !== UserRole.BILLIARD_ADMIN && actorRole !== UserRole.SUPERADMIN && actorId !== order.userId) {
+      throw new ForbiddenException('You are not allowed to cancel this order');
+    }
+
+    order.status = BilliardOrderStatus.CANCELLED;
+    await this.orderRepo.save(order);
+
+    const table = order.table;
+    table.status = BilliardTableStatus.FREE;
+    await this.tableRepo.save(table);
+    this.gateway.emitClub(order.clubId, 'booking-cancelled', order);
+    this.gateway.emitClub(order.clubId, 'table-updated', table);
+    return order;
+  }
+
+  async cancelItem(itemId: string, actorId: string, actorRole: string) {
+    const item = await this.itemRepo.findOne({ where: { id: itemId }, relations: ['order', 'order.user'] });
+    if (!item) throw new NotFoundException('Item not found');
+    if (item.status !== BilliardOrderItemStatus.PENDING) throw new BadRequestException('Only pending extra requests can be cancelled');
+    if (actorRole !== UserRole.BILLIARD_ADMIN && actorRole !== UserRole.SUPERADMIN && actorId !== item.order.userId) {
+      throw new ForbiddenException('You are not allowed to cancel this request');
+    }
+
+    const order = item.order;
+    await this.itemRepo.remove(item);
+    this.gateway.emitClub(order.clubId, 'extra-cancelled', { item, order });
+    return { cancelled: true };
+  }
+
   async getAnalytics(tenantId: string) {
     const club = await this.findAdminClub(tenantId);
     const archiveFrom = new Date();
@@ -359,24 +406,39 @@ export class BilliardService {
 
     const orders = await this.orderRepo.find({
       where: { clubId: club.id, status: BilliardOrderStatus.COMPLETED, closedAt: MoreThanOrEqual(archiveFrom) },
-      relations: ['table'],
+      relations: ['table', 'user'],
       order: { closedAt: 'DESC' },
     });
 
     const byTable = new Map<string, any>();
+    const byUser = new Map<string, any>();
     for (const order of orders) {
-      const key = order.tableId;
-      const current = byTable.get(key) || {
-        tableId: key,
+      const tableKey = order.tableId;
+      const tableCurrent = byTable.get(tableKey) || {
+        tableId: tableKey,
         tableName: order.table?.name || 'Stol',
         sessions: 0,
         minutes: 0,
         revenue: 0,
       };
-      current.sessions += 1;
-      current.minutes += Number(order.durationMinutes || 0);
-      current.revenue += Number(order.total || 0);
-      byTable.set(key, current);
+      tableCurrent.sessions += 1;
+      tableCurrent.minutes += Number(order.durationMinutes || 0);
+      tableCurrent.revenue += Number(order.total || 0);
+      byTable.set(tableKey, tableCurrent);
+
+      const userKey = order.userId || 'unknown';
+      const userLabel = order.user ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() || order.user.phone : 'Mijoz';
+      const userCurrent = byUser.get(userKey) || {
+        userId: userKey,
+        userName: userLabel,
+        sessions: 0,
+        minutes: 0,
+        revenue: 0,
+      };
+      userCurrent.sessions += 1;
+      userCurrent.minutes += Number(order.durationMinutes || 0);
+      userCurrent.revenue += Number(order.total || 0);
+      byUser.set(userKey, userCurrent);
     }
 
     return {
@@ -387,6 +449,7 @@ export class BilliardService {
         revenue: orders.reduce((s, o) => s + Number(o.total || 0), 0),
       },
       byTable: Array.from(byTable.values()).sort((a, b) => b.revenue - a.revenue),
+      byUser: Array.from(byUser.values()).sort((a, b) => b.revenue - a.revenue),
       archive: orders,
     };
   }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 import { useLang } from '@/lib/i18n';
@@ -13,16 +13,18 @@ import {
   Table2, ClipboardList, Star, Percent, X
 } from 'lucide-react';
 
-type NavKey = 'dashboard' | 'categories' | 'products' | 'tables' | 'orders' | 'staff' | 'inventory' | 'discounts' | 'reports' | 'settings' | 'cafes' | 'subscriptions' | 'users';
+type NavKey = 'dashboard' | 'categories' | 'products' | 'tables' | 'orders' | 'staff' | 'inventory' | 'discounts' | 'reports' | 'settings' | 'cafes' | 'subscriptions' | 'users' | 'analytics';
 
-const SUPERADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
+type NavItem = { href: string; key: NavKey; icon: any; label?: string };
+
+const SUPERADMIN_NAV: NavItem[] = [
   { href: '/superadmin', key: 'dashboard', icon: LayoutDashboard },
   { href: '/superadmin/tenants', key: 'cafes', icon: Store },
   { href: '/superadmin/subscriptions', key: 'subscriptions', icon: Star },
   { href: '/superadmin/users', key: 'users', icon: Users },
 ];
 
-const ADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
+const ADMIN_NAV: NavItem[] = [
   { href: '/admin', key: 'dashboard', icon: LayoutDashboard },
   { href: '/admin/categories', key: 'categories', icon: Tag },
   { href: '/admin/products', key: 'products', icon: Package },
@@ -35,25 +37,28 @@ const ADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
   { href: '/admin/settings', key: 'settings', icon: Settings },
 ];
 
-const BILLIARD_NAV: { href: string; key: NavKey; icon: any }[] = [
-  { href: '/billiard-admin', key: 'dashboard', icon: LayoutDashboard },
+const BILLIARD_NAV: NavItem[] = [
+  { href: '/billiard-admin?view=dashboard', key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/billiard-admin?view=tables', key: 'tables', icon: Table2, label: "Stollar" },
+  { href: '/billiard-admin?view=inventory', key: 'inventory', icon: Package, label: "Ombor" },
+  { href: '/billiard-admin?view=analytics', key: 'analytics', icon: BarChart2, label: "Tahlil" },
 ];
 
-const CASHIER_NAV: { href: string; key: NavKey; icon: any }[] = [
+const CASHIER_NAV: NavItem[] = [
   { href: '/cashier', key: 'dashboard', icon: LayoutDashboard },
   { href: '/cashier/orders', key: 'orders', icon: ClipboardList },
 ];
 
-const WAITER_NAV: { href: string; key: NavKey; icon: any }[] = [
+const WAITER_NAV: NavItem[] = [
   { href: '/waiter', key: 'tables', icon: Table2 },
   { href: '/waiter/orders', key: 'orders', icon: ClipboardList },
 ];
 
-const KITCHEN_NAV: { href: string; key: NavKey; icon: any }[] = [
+const KITCHEN_NAV: NavItem[] = [
   { href: '/kitchen', key: 'orders', icon: ClipboardList },
 ];
 
-const NAV_MAP: Record<string, typeof ADMIN_NAV> = {
+const NAV_MAP: Record<string, NavItem[]> = {
   superadmin: SUPERADMIN_NAV,
   cafe_admin: ADMIN_NAV,
   cashier: CASHIER_NAV,
@@ -65,6 +70,7 @@ const NAV_MAP: Record<string, typeof ADMIN_NAV> = {
 
 export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileOpen?: boolean; onMobileClose?: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const { tr } = useLang();
@@ -109,9 +115,14 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileO
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-        {navItems.map(({ href, key, icon: Icon }) => {
-          const label = tr.nav[key] ?? key;
-          const isActive = pathname === href || (href !== '/admin' && href !== '/superadmin' && pathname.startsWith(href));
+        {navItems.map(({ href, key, icon: Icon, label }) => {
+          const labelText = (tr.nav as Record<string, string>)[key] ?? label ?? key;
+          const currentView = searchParams.get('view');
+          const targetView = href.includes('?view=') ? href.split('?view=')[1] : undefined;
+          const isActive = (pathname === href.split('?')[0]
+            && (!targetView || currentView === targetView))
+            || (pathname.startsWith(href.split('?')[0]) && href === pathname);
+
           return (
             <Link
               key={href}

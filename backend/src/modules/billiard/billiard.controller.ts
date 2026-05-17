@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Post, Body, UseGuards, Patch } from '@nestjs/common';
+import { Controller, Get, Param, Query, Post, Body, UseGuards, Patch, Delete } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -118,6 +118,14 @@ export class BilliardController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
   @ApiBearerAuth()
+  @Delete('admin/extras/:id')
+  deleteExtra(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
+    return this.service.deleteExtra(tenantId, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
   @Post('admin/tables/:id/open')
   openTable(@CurrentUser('tenantId') tenantId: string, @CurrentUser('id') adminId: string, @Param('id') id: string) {
     return this.service.openTableByAdmin(tenantId, adminId, id);
@@ -163,11 +171,24 @@ export class BilliardController {
     return this.service.acknowledgeItem(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('orders/:id/cancel')
+  cancelOrder(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('role') role: string) {
+    return this.service.cancelOrder(id, userId, role);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('orders/items/:id/cancel')
+  cancelItem(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('role') role: string) {
+    return this.service.cancelItem(id, userId, role);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('orders/:id/close')
-  closeOrder(@Param('id') id: string) {
-    return this.service.closeOrder(id);
+  closeOrder(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('role') role: string) {
+    return this.service.closeOrder(id, userId, role);
   }
 }
