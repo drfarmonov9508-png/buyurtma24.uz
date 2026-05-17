@@ -1,22 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/store/auth.store';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, UtensilsCrossed, UserPlus, X } from 'lucide-react';
+import { UserPlus, X, UtensilsCrossed } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
 import LanguageSelector from '@/components/ui/LanguageSelector';
 
-const ROLE_REDIRECT: Record<string, string> = {
-  superadmin: '/superadmin',
-  cafe_admin: '/admin',
-  manager: '/manager',
-  cashier: '/cashier',
-  waiter: '/waiter',
-  kitchen: '/kitchen',
-  client: '/client',
-};
+const PHONE_COOKIE = 'rememberedPhone';
 
 const cardMotion = {
   hidden: { opacity: 0, y: 24, scale: 0.96 },
@@ -31,39 +25,54 @@ const floatMotion = {
 };
 
 export default function LoginPage() {
+  const router = useRouter();
   const { tr } = useLang();
   const a = tr.auth;
-  const { staffLogin, clientLogin, isLoading } = useAuthStore();
-  const [showPw, setShowPw] = useState(false);
-  const [form, setForm] = useState({ phone: '', password: '' });
-
+  const { clientLogin, isLoading } = useAuthStore();
+  const [phone, setPhone] = useState('');
+  const [remembered, setRemembered] = useState('');
   const [showRegister, setShowRegister] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
-  const [reg, setReg] = useState({ phone: '' });
+
+  useEffect(() => {
+    const saved = Cookies.get(PHONE_COOKIE);
+    if (saved) {
+      setPhone(saved);
+      setRemembered(saved);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!phone.trim()) {
+      toast.error('Telefon raqam kerak');
+      return;
+    }
+
+    setRegLoading(true);
     try {
-      const user = await staffLogin(form.phone, form.password);
-      const role = (user?.role || '').toLowerCase();
-      toast.success(a.welcome);
-      window.location.assign(ROLE_REDIRECT[role] || '/');
+      await clientLogin(phone.trim());
+      Cookies.set(PHONE_COOKIE, phone.trim(), { expires: 90, sameSite: 'lax' });
+      toast.success('Xush kelibsiz!');
+      router.push('/client');
     } catch (err: any) {
       const msg = err?.response?.data?.message;
-      toast.error(Array.isArray(msg) ? msg[0] : msg || a.error);
+      toast.error(Array.isArray(msg) ? msg[0] : msg || 'Kirishda xato');
+    } finally {
+      setRegLoading(false);
     }
   };
 
-  const handleClientLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleQuickContinue = async () => {
+    if (!remembered) return;
     setRegLoading(true);
     try {
-      await clientLogin(reg.phone);
-      toast.success(a.welcome);
-      window.location.assign('/client');
+      await clientLogin(remembered);
+      toast.success('Xush kelibsiz!');
+      router.push('/client');
     } catch (err: any) {
       const msg = err?.response?.data?.message;
-      toast.error(Array.isArray(msg) ? msg[0] : msg || a.register_error);
+      toast.error(Array.isArray(msg) ? msg[0] : msg || 'Kirishda xato');
     } finally {
       setRegLoading(false);
     }
@@ -132,62 +141,53 @@ export default function LoginPage() {
 
               <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <label className="label text-slate-300">{a.phone}</label>
+                  <label className="label text-slate-300">Telefon raqam</label>
                   <input
                     className="input bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-cyan-400 focus:ring-cyan-400"
                     type="tel"
                     placeholder="+998 90 123 45 67"
                     required
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                   />
-                </div>
-                <div className="space-y-2">
-                  <label className="label text-slate-300">{a.password}</label>
-                  <div className="relative">
-                    <input
-                      className="input bg-slate-900/90 border-slate-700 pr-12 text-white placeholder-slate-500 focus:border-cyan-400 focus:ring-cyan-400"
-                      type={showPw ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      required
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100"
-                      onClick={() => setShowPw(!showPw)}
-                    >
-                      {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={regLoading || isLoading}
                   className="btn-primary w-full h-12 rounded-3xl bg-gradient-to-r from-cyan-500 to-primary-600 text-base shadow-lg shadow-cyan-500/20 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl"
                 >
-                  {isLoading
+                  {regLoading || isLoading
                     ? <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    : a.submit}
+                    : 'Kirish'}
                 </button>
               </form>
 
-              <div className="mt-6 grid gap-3">
-                <div className="flex items-center justify-center gap-3 text-xs uppercase tracking-[0.3em] text-slate-500">
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-500">
                   <span className="h-px flex-1 bg-slate-700/60" />
-                  <span>{a.or}</span>
-                  <span className="h-px flex-1 bg-slate-700/60" /></div>
-                <motion.button
-                  type="button"
-                  whileHover={{ y: -2 }}
-                  onClick={() => setShowRegister(true)}
-                  className="btn-secondary w-full h-12 rounded-3xl border border-slate-700 bg-slate-900/80 text-slate-200 shadow-sm hover:bg-slate-800"
-                >
-                  <UserPlus size={18} />
-                  {a.guest_btn}
-                </motion.button>
+                  <span>Yoki</span>
+                  <span className="h-px flex-1 bg-slate-700/60" />
+                </div>
+
+                {remembered ? (
+                  <button
+                    type="button"
+                    onClick={handleQuickContinue}
+                    className="btn-secondary w-full h-12 rounded-3xl border border-slate-700 bg-slate-900/80 text-slate-200 shadow-sm hover:bg-slate-800"
+                  >
+                    {remembered} bilan davom etish
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowRegister(true)}
+                    className="btn-secondary w-full h-12 rounded-3xl border border-slate-700 bg-slate-900/80 text-slate-200 shadow-sm hover:bg-slate-800"
+                  >
+                    <UserPlus size={18} />
+                    Mehmon sifatida davom etish
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>
@@ -221,17 +221,17 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleClientLogin} className="space-y-5">
+              <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <label className="label text-slate-300">{a.phone_req}</label>
+                  <label className="label text-slate-300">Telefon raqam</label>
                   <input
                     className="input bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-cyan-400 focus:ring-cyan-400"
                     type="tel"
                     placeholder="+998 90 123 45 67"
                     required
                     autoFocus
-                    value={reg.phone}
-                    onChange={(e) => setReg({ phone: e.target.value })}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                   />
                   <p className="text-sm text-slate-500">Telefon raqamingizni kiriting, parol shart emas.</p>
                 </div>
@@ -240,10 +240,10 @@ export default function LoginPage() {
                   <button type="button" onClick={() => setShowRegister(false)} className="btn-secondary flex-1 h-12 rounded-3xl text-slate-200 bg-slate-900/75 hover:bg-slate-800">
                     {tr.common.cancel}
                   </button>
-                  <button type="submit" disabled={regLoading} className="btn-primary flex-1 h-12 rounded-3xl bg-gradient-to-r from-primary-500 to-cyan-500 text-white shadow-lg shadow-cyan-500/20 hover:-translate-y-0.5">
-                    {regLoading
+                  <button type="submit" disabled={regLoading || isLoading} className="btn-primary flex-1 h-12 rounded-3xl bg-gradient-to-r from-primary-500 to-cyan-500 text-white shadow-lg shadow-cyan-500/20 hover:-translate-y-0.5">
+                    {regLoading || isLoading
                       ? <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      : a.register}
+                      : 'Davom etish'}
                   </button>
                 </div>
               </form>

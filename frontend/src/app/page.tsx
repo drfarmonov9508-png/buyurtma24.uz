@@ -19,6 +19,7 @@ export default function HomePage() {
       case 'cashier': router.replace('/cashier'); break;
       case 'waiter': router.replace('/waiter'); break;
       case 'kitchen': router.replace('/kitchen'); break;
+      case 'client': router.replace('/client'); break;
       default: router.replace('/login');
     }
   }, [isAuthenticated, user, router]);

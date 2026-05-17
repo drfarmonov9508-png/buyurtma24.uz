@@ -25,6 +25,9 @@ import { QrModule } from './modules/qr/qr.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { RatingsModule } from './modules/ratings/ratings.module';
 import { ClientModule } from './modules/client/client.module';
+import { RegionsModule } from './modules/regions/regions.module';
+import { ServicesModule } from './modules/services/services.module';
+import { BilliardModule } from './modules/billiard/billiard.module';
 import databaseConfig from './config/database.config';
 
 @Module({
@@ -107,6 +110,9 @@ import databaseConfig from './config/database.config';
     MenuModule,
     RatingsModule,
     ClientModule,
+    RegionsModule,
+    ServicesModule,
+    BilliardModule,
   ],
 })
 export class AppModule {}

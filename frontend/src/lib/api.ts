@@ -63,6 +63,23 @@ export const publicApi = {
   getTenants: () => api.get('/v1/tenants/public'),
 };
 
+export const regionsApi = {
+  getTree: () => api.get('/v1/regions/tree'),
+  getAll: (params?: any) => api.get('/v1/regions', { params }),
+};
+
+export const servicesApi = {
+  getAll: (active = true) => api.get('/v1/services', { params: { active } }),
+};
+
+export const billiardApi = {
+  getClubs: (params?: any) => api.get('/v1/billiard/clubs', { params }),
+  getClub: (id: string) => api.get(`/v1/billiard/clubs/${id}`),
+  getTables: (clubId: string) => api.get(`/v1/billiard/clubs/${clubId}/tables`),
+  bookTable: (tableId: string, data: any) => api.post(`/v1/billiard/tables/${tableId}/book`, data),
+  getMyOrders: () => api.get('/v1/billiard/orders/my'),
+};
+
 export const tenantsApi = {
   getAll: (params?: any) => api.get('/v1/tenants', { params }),
   getOne: (id: string) => api.get(`/v1/tenants/${id}`),
