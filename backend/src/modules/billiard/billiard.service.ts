@@ -27,7 +27,7 @@ export class BilliardService {
     private readonly gateway: BilliardGateway,
   ) {}
 
-  async findClubs(regionId?: string, serviceSlug?: string) {
+  async findClubs(regionId?: string, serviceSlug?: string, city?: string) {
     const query = this.clubRepo.createQueryBuilder('club')
       .leftJoinAndSelect('club.region', 'region')
       .leftJoinAndSelect('club.service', 'service')
@@ -35,6 +35,7 @@ export class BilliardService {
 
     if (regionId) query.andWhere('club.regionId = :regionId', { regionId });
     if (serviceSlug) query.andWhere('service.slug = :serviceSlug', { serviceSlug });
+    if (city) query.andWhere('club.city = :city', { city });
 
     return query.orderBy('club.name', 'ASC').getMany();
   }

@@ -19,8 +19,8 @@ export class TenantsController {
   @Get('public')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List active cafes (public, no auth)' })
-  findPublic(@Query('regionId') regionId?: string, @Query('businessType') businessType?: string) {
-    return this.service.findPublic(regionId, businessType);
+  findPublic(@Query('regionId') regionId?: string, @Query('businessType') businessType?: string, @Query('city') city?: string) {
+    return this.service.findPublic(regionId, businessType, city);
   }
 
   @Roles(UserRole.SUPERADMIN)

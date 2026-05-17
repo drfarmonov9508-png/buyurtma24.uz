@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Region, RegionType } from './region.entity';
@@ -36,5 +36,41 @@ export class RegionsService {
 
   async findOne(id: string) {
     return this.repo.findOne({ where: { id, isActive: true } });
+  }
+
+  async create(dto: { name: string; type: RegionType; parentId?: string }) {
+    const name = dto.name?.trim();
+    if (!name) throw new NotFoundException('Hudud nomi kiritilmadi');
+
+    const parent = dto.parentId ? await this.findOne(dto.parentId) : null;
+    if (dto.parentId && !parent) throw new NotFoundException('Asosiy hudud topilmadi');
+
+    const slug = parent ? `${parent.slug}-${this.slugify(name)}`.slice(0, 100) : this.slugify(name);
+    const existing = await this.repo.findOne({
+      where: { slug, type: dto.type, parentId: dto.parentId || null, isActive: true } as any,
+    });
+    if (existing) return existing;
+
+    try {
+      return await this.repo.save(this.repo.create({
+        name,
+        slug,
+        type: dto.type,
+        parentId: dto.parentId || null,
+        path: parent ? `${parent.path || parent.slug}/${slug}` : slug,
+        isActive: true,
+      }));
+    } catch {
+      throw new ConflictException('Hudud allaqachon mavjud');
+    }
+  }
+
+  private slugify(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/['‘’`]/g, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 90) || `hudud-${Date.now()}`;
   }
 }

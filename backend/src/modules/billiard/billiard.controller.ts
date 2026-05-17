@@ -16,8 +16,9 @@ export class BilliardController {
   findClubs(
     @Query('regionId') regionId?: string,
     @Query('serviceSlug') serviceSlug?: string,
+    @Query('city') city?: string,
   ) {
-    return this.service.findClubs(regionId, serviceSlug);
+    return this.service.findClubs(regionId, serviceSlug, city);
   }
 
   @Get('clubs/:id')

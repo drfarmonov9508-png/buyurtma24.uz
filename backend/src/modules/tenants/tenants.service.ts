@@ -14,12 +14,16 @@ export class CreateTenantDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   slug: string;
 
   @IsEnum(BusinessType)
   @IsNotEmpty()
   businessType: BusinessType;
+
+  @IsOptional()
+  @IsString()
+  sportModule?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -80,7 +84,8 @@ export class TenantsService {
   ) {}
 
   async create(dto: CreateTenantDto) {
-    const existing = await this.tenantRepo.findOne({ where: { slug: dto.slug } });
+    const slug = await this.createUniqueSlug(dto.slug || dto.name);
+    const existing = await this.tenantRepo.findOne({ where: { slug } });
     if (existing) throw new ConflictException('Slug already taken');
 
     const trialEndsAt = new Date();
@@ -89,7 +94,7 @@ export class TenantsService {
     const tenant = await this.tenantRepo.save(
       this.tenantRepo.create({
         name: dto.name,
-        slug: dto.slug,
+        slug,
         businessType: dto.businessType,
         phone: dto.adminPhone,
         address: dto.address,
@@ -141,12 +146,13 @@ export class TenantsService {
     };
   }
 
-  async findPublic(regionId?: string, businessType?: string) {
+  async findPublic(regionId?: string, businessType?: string, city?: string) {
     const query = this.tenantRepo.createQueryBuilder('tenant')
       .where('tenant.status IN (:...statuses)', { statuses: [TenantStatus.ACTIVE, TenantStatus.TRIAL] });
 
     if (regionId) query.andWhere('tenant.regionId = :regionId', { regionId });
     if (businessType) query.andWhere('tenant.businessType = :businessType', { businessType });
+    if (city) query.andWhere('tenant.city = :city', { city });
 
     return query
       .select(['tenant.id', 'tenant.name', 'tenant.slug', 'tenant.address', 'tenant.landmark', 'tenant.city', 'tenant.regionId', 'tenant.businessType'])
@@ -203,5 +209,22 @@ export class TenantsService {
     await this.findOne(id);
     await this.tenantRepo.softDelete(id);
     return { message: 'Tenant deleted' };
+  }
+
+  private async createUniqueSlug(value: string) {
+    const base = value
+      .toLowerCase()
+      .replace(/['‘’`]/g, '')
+      .replace(/[^a-z0-9а-яёғқўҳ]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || `org-${Date.now()}`;
+
+    let slug = base;
+    let i = 1;
+    while (await this.tenantRepo.findOne({ where: { slug } })) {
+      i += 1;
+      slug = `${base}-${i}`;
+    }
+    return slug;
   }
 }

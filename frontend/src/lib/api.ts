@@ -66,6 +66,7 @@ export const publicApi = {
 export const regionsApi = {
   getTree: () => api.get('/v1/regions/tree'),
   getAll: (params?: any) => api.get('/v1/regions', { params }),
+  create: (data: any) => api.post('/v1/regions', data),
 };
 
 export const servicesApi = {
