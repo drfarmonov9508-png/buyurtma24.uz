@@ -2,17 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import {
-  AlertTriangle, BarChart3, BellRing, CalendarDays, Check, CheckCircle2, Clock, Copy,
-  Edit3, ImagePlus, PackageOpen, Plus, ReceiptText, Table2, Timer, Trash2,
-  WalletCards, X
+  AlertTriangle, BarChart3, BellRing, Check, Clock, PackageOpen, Plus,
+  ReceiptText, Table2, Timer, WalletCards, X
 } from 'lucide-react';
-import { billiardApi, uploadApi } from '@/lib/api';
+import { billiardApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import QRCode from 'qrcode.react';
 
 const tiers = [
   { value: 'oddiy', label: 'Oddiy' },
@@ -25,53 +22,16 @@ function minutesSince(date?: string) {
   return Math.max(1, Math.ceil((Date.now() - new Date(date).getTime()) / 60000));
 }
 
-function playAlertTone() {
-  try {
-    const ctx = new window.AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 620;
-    gain.gain.value = 0.08;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
-    setTimeout(() => ctx.close(), 200);
-  } catch {
-    // ignore autoplay restrictions
-  }
-}
-
-type NotificationEntry = {
-  id: string;
-  type: 'booking' | 'extra' | 'stock' | 'info';
-  title: string;
-  message: string;
-  createdAt: number;
-  read: boolean;
-};
-
 export default function BilliardAdminPage() {
   const qc = useQueryClient();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const defaultTab = (searchParams.get('view') as 'dashboard' | 'tables' | 'inventory' | 'analytics') || 'dashboard';
-  const [tab, setTab] = useState<'dashboard' | 'tables' | 'inventory' | 'analytics'>(defaultTab);
+  const [tab, setTab] = useState<'dashboard' | 'tables' | 'inventory' | 'analytics'>('dashboard');
   const [tableForm, setTableForm] = useState({ name: '', typeId: '', pricePerHour: '', capacity: '4' });
   const [typeForm, setTypeForm] = useState({ name: 'Oddiy', tier: 'oddiy', pricePerHour: '', details: '' });
-  const [inventoryForm, setInventoryForm] = useState<{ name: string; category: string; price: string; stockQuantity: string; alertThreshold: string; image: string }>({ name: '', category: 'Ichimlik', price: '', stockQuantity: '', alertThreshold: '', image: '' });
-  const [inventoryImageFile, setInventoryImageFile] = useState<File | null>(null);
-  const [editExtra, setEditExtra] = useState<any>(null);
+  const [inventoryForm, setInventoryForm] = useState({ name: '', category: 'Ichimlik', price: '', stockQuantity: '', alertThreshold: '', image: '' });
   const [serviceTable, setServiceTable] = useState<any>(null);
   const [serviceForm, setServiceForm] = useState({ extraId: '', quantity: 1 });
   const [stockAdds, setStockAdds] = useState<Record<string, string>>({});
-  const [qrTable, setQrTable] = useState<any>(null);
-  const [analyticsFilter, setAnalyticsFilter] = useState({ year: new Date().getFullYear(), month: '', userId: '' });
   const [receipt, setReceipt] = useState<any>(null);
-  const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
-  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['billiard-admin-snapshot'],
@@ -94,42 +54,6 @@ export default function BilliardAdminPage() {
   const analytics = analyticsData || {};
 
   useEffect(() => {
-    const current = (searchParams.get('view') as 'dashboard' | 'tables' | 'inventory' | 'analytics') || 'dashboard';
-    if (current !== tab) setTab(current);
-  }, [searchParams, tab]);
-
-  const changeTab = (value: 'dashboard' | 'tables' | 'inventory' | 'analytics') => {
-    router.replace(`/billiard-admin?view=${value}`);
-    setTab(value);
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const audioElement = new Audio('/notification.wav');
-      audioElement.preload = 'auto';
-      setAudio(audioElement);
-    }
-  }, []);
-
-  const addNotification = (notification: Omit<NotificationEntry, 'id' | 'createdAt' | 'read'>) => {
-    setNotifications((current) => [{
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now()),
-      createdAt: Date.now(),
-      read: false,
-      ...notification,
-    }, ...current].slice(0, 12));
-  };
-
-  const playNotificationSound = () => {
-    if (audio) {
-      audio.currentTime = 0;
-      void audio.play().catch(() => playAlertTone());
-    } else {
-      playAlertTone();
-    }
-  };
-
-  useEffect(() => {
     if (!club?.id) return;
     const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/api\/?$/, '');
     const socket = io(`${base}/billiard`, { query: { clubId: club.id }, transports: ['websocket', 'polling'] });
@@ -137,44 +61,18 @@ export default function BilliardAdminPage() {
       qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
       qc.invalidateQueries({ queryKey: ['billiard-analytics'] });
     };
-    socket.on('booking-requested', (payload) => {
-      refresh();
-      playNotificationSound();
-      addNotification({
-        type: 'booking',
-        title: 'Yangi bandlash so‘rovi',
-        message: `${payload?.table?.name || payload?.order?.table?.name || 'Stol'} bandlash so‘rovi keldi`,
-      });
-      toast.error(`${payload?.table?.name || payload?.order?.table?.name || 'Stol'}: yangi bandlash so'rovi`, { duration: 6000 });
-    });
-    socket.on('booking-confirmed', (payload) => {
-      refresh();
-      playNotificationSound();
-      addNotification({
-        type: 'booking',
-        title: 'Bandlash tasdiqlandi',
-        message: `${payload?.table?.name || 'Stol'} bandlash qabul qilindi`,
-      });
-      toast.success(`${payload?.table?.name || 'Stol'}: bandlash tasdiqlandi`);
-    });
+    socket.on('booking-requested', refresh);
+    socket.on('booking-confirmed', refresh);
     socket.on('extra-requested', (payload) => {
       refresh();
-      playNotificationSound();
-      addNotification({
-        type: 'extra',
-        title: 'Qo‘shimcha buyurtma',
-        message: `${payload?.order?.table?.name || 'Stol'} uchun qo'shimcha buyurtma so'raldi`,
-      });
       toast.error(`${payload?.order?.table?.name || 'Stol'}: qo'shimcha buyurtma so'raldi`, { duration: 6000 });
     });
     socket.on('extra-accepted', refresh);
-    socket.on('extra-cancelled', refresh);
-    socket.on('booking-cancelled', refresh);
     socket.on('inventory-updated', refresh);
     socket.on('table-updated', refresh);
     socket.on('order-closed', refresh);
     return () => { socket.disconnect(); };
-  }, [club?.id, qc, audio]);
+  }, [club?.id, qc]);
 
   const createType = useMutation({
     mutationFn: () => billiardApi.createType({ ...typeForm, pricePerHour: Number(typeForm.pricePerHour) }),
@@ -195,50 +93,15 @@ export default function BilliardAdminPage() {
   });
 
   const createInventory = useMutation({
-    mutationFn: async () => {
-      let imageUrl = inventoryForm.image;
-      if (inventoryImageFile) {
-        const upload = await uploadApi.uploadImage(inventoryImageFile);
-        imageUrl = upload.data.data?.url || upload.data.url || imageUrl || '';
-      }
-      return billiardApi.createExtra({
-        ...inventoryForm,
-        image: imageUrl,
-        price: Number(inventoryForm.price),
-        stockQuantity: Number(inventoryForm.stockQuantity),
-        alertThreshold: Number(inventoryForm.alertThreshold),
-      });
-    },
+    mutationFn: () => billiardApi.createExtra({
+      ...inventoryForm,
+      price: Number(inventoryForm.price),
+      stockQuantity: Number(inventoryForm.stockQuantity),
+      alertThreshold: Number(inventoryForm.alertThreshold),
+    }),
     onSuccess: () => {
       toast.success('Omborga mahsulot qo‘shildi');
       setInventoryForm({ name: '', category: 'Ichimlik', price: '', stockQuantity: '', alertThreshold: '', image: '' });
-      setInventoryImageFile(null);
-      qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
-    },
-  });
-
-  const updateExtra = useMutation({
-    mutationFn: async ({ id, payload }: any) => {
-      let imageUrl = payload.image;
-      if (inventoryImageFile) {
-        const upload = await uploadApi.uploadImage(inventoryImageFile);
-        imageUrl = upload.data.data?.url || upload.data.url || imageUrl || '';
-      }
-      return billiardApi.updateExtra(id, { ...payload, image: imageUrl });
-    },
-    onSuccess: () => {
-      toast.success('Mahsulot yangilandi');
-      setEditExtra(null);
-      setInventoryImageFile(null);
-      setInventoryForm({ name: '', category: 'Ichimlik', price: '', stockQuantity: '', alertThreshold: '', image: '' });
-      qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
-    },
-  });
-
-  const deleteExtra = useMutation({
-    mutationFn: (id: string) => billiardApi.deleteExtra(id),
-    onSuccess: () => {
-      toast.success('Mahsulot o‘chirildi');
       qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
     },
   });
@@ -248,22 +111,6 @@ export default function BilliardAdminPage() {
     onSuccess: () => {
       toast.success('Ombor soni yangilandi');
       setStockAdds({});
-      qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
-    },
-  });
-
-  const cancelOrder = useMutation({
-    mutationFn: (id: string) => billiardApi.cancelOrder(id),
-    onSuccess: () => {
-      toast.success('Bandlash bekor qilindi');
-      qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
-    },
-  });
-
-  const cancelItem = useMutation({
-    mutationFn: (id: string) => billiardApi.cancelItem(id),
-    onSuccess: () => {
-      toast.success('Qo‘shimcha buyurtma bekor qilindi');
       qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
     },
   });
@@ -334,81 +181,7 @@ export default function BilliardAdminPage() {
 
   const activeOrders = orders.filter((o) => o.status === 'confirmed');
   const lowStock = extras.filter((e) => Number(e.alertThreshold || 0) > 0 && Number(e.stockQuantity || 0) <= Number(e.alertThreshold || 0));
-  const notificationCount = pendingItems.length + lowStock.length;
-  const unreadCount = notifications.filter((item) => !item.read).length;
   const selectedOrder = serviceTable ? ordersByTable.get(serviceTable.id) : null;
-
-  const archiveOrders = analytics?.archive || [];
-  const analyticsUsers = useMemo(() => {
-    const map = new Map<string, any>();
-    archiveOrders.forEach((order: any) => {
-      const key = order.userId || 'unknown';
-      const label = order.user ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() || order.user.phone : 'Mijoz';
-      if (!map.has(key)) {
-        map.set(key, { userId: key, label, sessions: 0, minutes: 0, revenue: 0 });
-      }
-      const current = map.get(key);
-      current.sessions += 1;
-      current.minutes += Number(order.durationMinutes || 0);
-      current.revenue += Number(order.total || 0);
-    });
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [archiveOrders]);
-
-  const filteredArchive = useMemo(() => {
-    return archiveOrders.filter((order: any) => {
-      const closedAt = new Date(order.closedAt || order.confirmedAt || order.startAt || order.createdAt || '');
-      if (analyticsFilter.year && closedAt.getFullYear() !== Number(analyticsFilter.year)) return false;
-      if (analyticsFilter.month && closedAt.getMonth() + 1 !== Number(analyticsFilter.month)) return false;
-      if (analyticsFilter.userId && order.userId !== analyticsFilter.userId) return false;
-      return true;
-    });
-  }, [archiveOrders, analyticsFilter]);
-
-  const analyticsTotalsFiltered = useMemo(() => ({
-    sessions: filteredArchive.length,
-    minutes: filteredArchive.reduce((sum: number, order: any) => sum + Number(order.durationMinutes || 0), 0),
-    revenue: filteredArchive.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0),
-  }), [filteredArchive]);
-
-  const analyticsByTable = useMemo(() => {
-    const map = new Map<string, any>();
-    filteredArchive.forEach((order: any) => {
-      const key = order.tableId;
-      const current = map.get(key) || { tableId: key, tableName: order.table?.name || 'Stol', sessions: 0, minutes: 0, revenue: 0 };
-      current.sessions += 1;
-      current.minutes += Number(order.durationMinutes || 0);
-      current.revenue += Number(order.total || 0);
-      map.set(key, current);
-    });
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [filteredArchive]);
-
-  const analyticsByUser = useMemo(() => {
-    const map = new Map<string, any>();
-    filteredArchive.forEach((order: any) => {
-      const key = order.userId || 'unknown';
-      const current = map.get(key) || {
-        userId: key,
-        userName: order.user ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() || order.user.phone : 'Mijoz',
-        sessions: 0,
-        minutes: 0,
-        revenue: 0,
-      };
-      current.sessions += 1;
-      current.minutes += Number(order.durationMinutes || 0);
-      current.revenue += Number(order.total || 0);
-      map.set(key, current);
-    });
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [filteredArchive]);
-
-  const openNotificationCenter = () => {
-    setShowNotificationCenter(true);
-    setNotifications((current) => current.map((item) => item.read ? item : { ...item, read: true }));
-  };
-
-  const clearNotifications = () => setNotifications([]);
 
   return (
     <div className="space-y-6">
@@ -426,28 +199,6 @@ export default function BilliardAdminPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {[
-            ['dashboard', 'Dashboard', WalletCards],
-            ['tables', 'Stollar', Table2],
-            ['inventory', 'Ombor', PackageOpen],
-            ['analytics', 'Tahlil', BarChart3],
-          ].map(([key, label, Icon]: any) => (
-            <button key={key} onClick={() => changeTab(key)} className={`inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-semibold transition ${tab === key ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-              <Icon size={16} /> {label}
-              {key === 'dashboard' && notificationCount > 0 && (
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-semibold text-white">{notificationCount}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        <button onClick={openNotificationCenter} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
-          <BellRing size={16} /> Bildirishnomalar
-          {unreadCount > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-semibold text-white">{unreadCount}</span>}
-        </button>
-      </div>
-
       <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {[
           ['dashboard', 'Dashboard', WalletCards],
@@ -455,35 +206,11 @@ export default function BilliardAdminPage() {
           ['inventory', 'Ombor', PackageOpen],
           ['analytics', 'Tahlil', BarChart3],
         ].map(([key, label, Icon]: any) => (
-          <button key={key} onClick={() => changeTab(key)} className={`inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-semibold transition ${tab === key ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+          <button key={key} onClick={() => setTab(key)} className={`inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-semibold transition ${tab === key ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
             <Icon size={16} /> {label}
-            {key === 'dashboard' && notificationCount > 0 && (
-              <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-semibold text-white">{notificationCount}</span>
-            )}
           </button>
         ))}
       </div>
-      {(pendingItems.length > 0 || lowStock.length > 0) && (
-        <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-red-800 shadow-sm dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Urgent notifications</p>
-              <p className="text-sm text-red-700 dark:text-red-200">{pendingItems.length} yangi so‘rov va {lowStock.length} kam ombor holati mavjud.</p>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/70 dark:text-red-100">
-              <BellRing size={16} /> {notificationCount} ta ogohlantirish
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showNotificationCenter && (
-        <NotificationCenter
-          notifications={notifications}
-          onClose={() => setShowNotificationCenter(false)}
-          onClear={clearNotifications}
-        />
-      )}
 
       {lowStock.length > 0 && (
         <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
@@ -494,7 +221,7 @@ export default function BilliardAdminPage() {
 
       {tab === 'dashboard' && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {tables.map((table) => <TableCard key={table.id} table={table} order={ordersByTable.get(table.id)} alerts={pendingByTable.get(table.id) || []} onOpen={() => openTable.mutate(table.id)} onConfirm={confirm.mutate} onClose={close.mutate} onService={() => setServiceTable(table)} onQr={() => setQrTable(table)} onCancelOrder={cancelOrder.mutate} onAcknowledge={acknowledge.mutate} onCancelItem={cancelItem.mutate} />)}
+          {tables.map((table) => <TableCard key={table.id} table={table} order={ordersByTable.get(table.id)} alerts={pendingByTable.get(table.id) || []} onOpen={() => openTable.mutate(table.id)} onConfirm={confirm.mutate} onClose={close.mutate} onService={() => setServiceTable(table)} onAcknowledge={acknowledge.mutate} />)}
         </section>
       )}
 
@@ -544,17 +271,7 @@ export default function BilliardAdminPage() {
             <div className="space-y-3">
               <input className="input rounded-2xl" placeholder="Kola 1.5L" value={inventoryForm.name} onChange={(e) => setInventoryForm({ ...inventoryForm, name: e.target.value })} />
               <input className="input rounded-2xl" placeholder="Kategoriya" value={inventoryForm.category} onChange={(e) => setInventoryForm({ ...inventoryForm, category: e.target.value })} />
-              <div className="grid gap-2 sm:grid-cols-2">
-                <label className="block">
-                  <span className="label">Rasm URL</span>
-                  <input className="input rounded-2xl" placeholder="https://..." value={inventoryForm.image} onChange={(e) => setInventoryForm({ ...inventoryForm, image: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className="label">Rasm fayli</span>
-                  <input className="input rounded-2xl" type="file" accept="image/*" onChange={(e) => setInventoryImageFile(e.target.files?.[0] || null)} />
-                </label>
-              </div>
-              {inventoryImageFile && <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">Fayl tanlandi: {inventoryImageFile.name}</div>}
+              <input className="input rounded-2xl" placeholder="Rasm URL" value={inventoryForm.image} onChange={(e) => setInventoryForm({ ...inventoryForm, image: e.target.value })} />
               <div className="grid grid-cols-3 gap-2">
                 <input className="input rounded-2xl" placeholder="Narx" type="number" value={inventoryForm.price} onChange={(e) => setInventoryForm({ ...inventoryForm, price: e.target.value })} />
                 <input className="input rounded-2xl" placeholder="Soni" type="number" value={inventoryForm.stockQuantity} onChange={(e) => setInventoryForm({ ...inventoryForm, stockQuantity: e.target.value })} />
@@ -568,16 +285,8 @@ export default function BilliardAdminPage() {
               const low = Number(item.alertThreshold || 0) > 0 && Number(item.stockQuantity || 0) <= Number(item.alertThreshold || 0);
               return (
                 <div key={item.id} className={`overflow-hidden rounded-3xl border bg-white shadow-sm dark:bg-slate-900 ${low ? 'border-red-300 ring-4 ring-red-500/10' : 'border-slate-200 dark:border-slate-800'}`}>
-                  <div className="relative h-32 bg-slate-100 dark:bg-slate-800">
+                  <div className="h-32 bg-slate-100 dark:bg-slate-800">
                     {item.image ? <img src={item.image} alt={item.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><PackageOpen /></div>}
-                    <div className="absolute right-3 top-3 flex gap-2">
-                      <button title="Tahrirlash" className="rounded-2xl bg-white/90 p-2 text-slate-700 shadow-sm dark:bg-slate-950/90 dark:text-slate-100" onClick={() => {
-                        setEditExtra(item);
-                        setInventoryForm({ name: item.name, category: item.category || 'Ichimlik', price: String(item.price), stockQuantity: String(item.stockQuantity), alertThreshold: String(item.alertThreshold), image: item.image || '' });
-                        setInventoryImageFile(null);
-                      }}><Edit3 size={16} /></button>
-                      <button title="O‘chirish" className="rounded-2xl bg-white/90 p-2 text-red-600 shadow-sm dark:bg-slate-950/90 dark:text-red-400" onClick={() => deleteExtra.mutate(item.id)}><Trash2 size={16} /></button>
-                    </div>
                   </div>
                   <div className="space-y-3 p-4">
                     <div className="flex items-start justify-between gap-2">
@@ -604,88 +313,22 @@ export default function BilliardAdminPage() {
       {tab === 'analytics' && (
         <section className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <Metric label="Sessiyalar" value={analyticsTotalsFiltered.sessions} />
-            <Metric label="Daqiqa" value={analyticsTotalsFiltered.minutes} />
-            <Metric label="Jami tushum" value={formatCurrency(Number(analyticsTotalsFiltered.revenue))} />
+            <Metric label="Sessiyalar" value={analytics?.totals?.sessions || 0} />
+            <Metric label="Daqiqa" value={analytics?.totals?.minutes || 0} />
+            <Metric label="Jami tushum" value={formatCurrency(Number(analytics?.totals?.revenue || 0))} />
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="block">
-              <span className="label">Yil</span>
-              <select className="input rounded-2xl" value={analyticsFilter.year} onChange={(e) => setAnalyticsFilter({ ...analyticsFilter, year: Number(e.target.value) })}>
-                {Array.from({ length: analytics?.archiveYears || 5 }, (_, idx) => new Date().getFullYear() - idx).map((year) => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="label">Oy</span>
-              <select className="input rounded-2xl" value={analyticsFilter.month} onChange={(e) => setAnalyticsFilter({ ...analyticsFilter, month: e.target.value })}>
-                <option value="">Barchasi</option>
-                {['Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek'].map((label, index) => (
-                  <option key={label} value={index + 1}>{label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="label">Mijoz</span>
-              <select className="input rounded-2xl" value={analyticsFilter.userId} onChange={(e) => setAnalyticsFilter({ ...analyticsFilter, userId: e.target.value })}>
-                <option value="">Barchasi</option>
-                {analyticsUsers.map((user: any) => (
-                  <option key={user.userId} value={user.userId}>{user.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="mb-3 font-semibold">Filtrlangan stol va mijozlar</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {analyticsByTable.slice(0, 4).map((row: any) => (
-                <div key={row.tableId} className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800">
-                  <p className="text-sm text-slate-500">{row.tableName}</p>
-                  <p className="mt-1 text-lg font-semibold">{formatCurrency(Number(row.revenue))}</p>
-                  <p className="text-xs text-slate-400">{row.sessions} sessiya · {row.minutes} min</p>
+            <h2 className="mb-3 font-semibold">Stollar bo‘yicha tushum</h2>
+            <div className="space-y-2">
+              {(analytics?.byTable || []).map((row: any) => (
+                <div key={row.tableId} className="grid grid-cols-4 gap-2 rounded-2xl bg-slate-50 p-3 text-sm dark:bg-slate-800">
+                  <b>{row.tableName}</b><span>{row.sessions} sessiya</span><span>{row.minutes} min</span><b className="text-right">{formatCurrency(Number(row.revenue))}</b>
                 </div>
               ))}
+              {(analytics?.byTable || []).length === 0 && <p className="py-8 text-center text-slate-400">Arxivda yakunlangan sessiyalar hali yo‘q</p>}
             </div>
-            {analyticsByTable.length === 0 && <p className="py-8 text-center text-slate-400">Hech qanday yopilgan sessiya topilmadi</p>}
+            <p className="mt-4 text-xs text-slate-400">Arxiv yakunlangan sessiyalarni 5 yilgacha saqlash mantiqi bilan olinadi.</p>
           </div>
-
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="mb-3 font-semibold">Foydalanuvchilar bo‘yicha</h2>
-              <div className="space-y-2">
-                {analyticsByUser.slice(0, 5).map((user: any) => (
-                  <div key={user.userId} className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-50 p-3 text-sm dark:bg-slate-800">
-                    <span>{user.userName}</span>
-                    <span>{user.sessions} sessiya</span>
-                    <b className="text-right">{formatCurrency(Number(user.revenue))}</b>
-                  </div>
-                ))}
-                {analyticsByUser.length === 0 && <p className="py-8 text-center text-slate-400">Mijozlar uchun ma'lumotlar yo'q</p>}
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="mb-3 font-semibold">Yakunlangan sessiyalar</h2>
-              <div className="space-y-3">
-                {filteredArchive.slice(0, 6).map((order: any) => (
-                  <div key={order.id} className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold">{order.table?.name || 'Stol'}</p>
-                      <span className="text-xs text-slate-500">{order.user?.phone || 'Anonim'}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500">{order.closedAt ? new Date(order.closedAt).toLocaleDateString() : '—'}</p>
-                    <div className="mt-2 flex items-center justify-between text-sm">
-                      <span>{order.durationMinutes} min</span>
-                      <b>{formatCurrency(Number(order.total || 0))}</b>
-                    </div>
-                  </div>
-                ))}
-                {filteredArchive.length === 0 && <p className="py-8 text-center text-slate-400">Filtrlangan natija bo'yicha sessiyalar topilmadi</p>}
-              </div>
-            </div>
-          </div>
-          <p className="mt-4 text-xs text-slate-400">Arxiv yakunlangan sessiyalarni 5 yilgacha saqlash mantiqi bilan olinadi.</p>
         </section>
       )}
 
@@ -698,46 +341,6 @@ export default function BilliardAdminPage() {
             </select>
             <input className="input rounded-2xl" type="number" min={1} value={serviceForm.quantity} onChange={(e) => setServiceForm({ ...serviceForm, quantity: Number(e.target.value || 1) })} />
             <button className="btn-primary h-12 w-full rounded-2xl" disabled={!selectedOrder} onClick={() => addItem.mutate({ orderId: selectedOrder?.id, extraId: serviceForm.extraId, quantity: serviceForm.quantity })}>Hisobga qo‘shish</button>
-          </div>
-        </Modal>
-      )}
-
-      {qrTable && (
-        <Modal onClose={() => setQrTable(null)} title={`${qrTable.name}: QR kod`}>
-          <div className="space-y-4 text-center">
-            <div className="mx-auto rounded-3xl bg-slate-100 p-4 dark:bg-slate-900">
-              <QRCode value={typeof window !== 'undefined' ? `${window.location.origin}/client/sport/${club?.id}/tables?tableId=${qrTable.id}` : `/client/sport/${club?.id}/tables?tableId=${qrTable.id}`} size={200} />
-            </div>
-            <p className="text-sm text-slate-500">Mijoz telefoniga skanerlash uchun foydalanilsin.</p>
-            <button className="btn-secondary w-full rounded-2xl" onClick={() => {
-              const text = typeof window !== 'undefined' ? `${window.location.origin}/client/sport/${club?.id}/tables?tableId=${qrTable.id}` : `/client/sport/${club?.id}/tables?tableId=${qrTable.id}`;
-              navigator.clipboard.writeText(text).then(() => toast.success('Havola nusxalandi'));
-            }}>Havolani nusxalash</button>
-          </div>
-        </Modal>
-      )}
-
-      {editExtra && (
-        <Modal onClose={() => { setEditExtra(null); setInventoryImageFile(null); }} title="Ombor mahsulotini tahrirlash">
-          <div className="space-y-3">
-            <input className="input rounded-2xl" placeholder="Mahsulot nomi" value={inventoryForm.name} onChange={(e) => setInventoryForm({ ...inventoryForm, name: e.target.value })} />
-            <input className="input rounded-2xl" placeholder="Kategoriya" value={inventoryForm.category} onChange={(e) => setInventoryForm({ ...inventoryForm, category: e.target.value })} />
-            <div className="grid gap-2 sm:grid-cols-2">
-              <label className="block">
-                <span className="label">Rasm URL</span>
-                <input className="input rounded-2xl" value={inventoryForm.image} onChange={(e) => setInventoryForm({ ...inventoryForm, image: e.target.value })} />
-              </label>
-              <label className="block">
-                <span className="label">Rasm fayli</span>
-                <input className="input rounded-2xl" type="file" accept="image/*" onChange={(e) => setInventoryImageFile(e.target.files?.[0] || null)} />
-              </label>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <input className="input rounded-2xl" placeholder="Narx" type="number" value={inventoryForm.price} onChange={(e) => setInventoryForm({ ...inventoryForm, price: e.target.value })} />
-              <input className="input rounded-2xl" placeholder="Soni" type="number" value={inventoryForm.stockQuantity} onChange={(e) => setInventoryForm({ ...inventoryForm, stockQuantity: e.target.value })} />
-              <input className="input rounded-2xl" placeholder="Ogohlantirish" type="number" value={inventoryForm.alertThreshold} onChange={(e) => setInventoryForm({ ...inventoryForm, alertThreshold: e.target.value })} />
-            </div>
-            <button className="btn-primary w-full rounded-2xl" onClick={() => updateExtra.mutate({ id: editExtra.id, payload: { name: inventoryForm.name, category: inventoryForm.category, price: Number(inventoryForm.price), stockQuantity: Number(inventoryForm.stockQuantity), alertThreshold: Number(inventoryForm.alertThreshold), image: inventoryForm.image } })}>Saqlash</button>
           </div>
         </Modal>
       )}
@@ -776,39 +379,7 @@ function Metric({ label, value, danger, warning }: any) {
   );
 }
 
-function NotificationCenter({ notifications, onClose, onClear }: { notifications: NotificationEntry[]; onClose: () => void; onClear: () => void }) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">Bildirishnoma markazi</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">So‘nggi real vaqt hodisalar uchun.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-100 dark:hover:bg-slate-800" onClick={onClear}>Tozalash</button>
-          <button className="rounded-2xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-950" onClick={onClose}>Yopish</button>
-        </div>
-      </div>
-      <div className="space-y-3">
-        {notifications.length === 0 ? (
-          <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400">Hech qanday bildirishnoma yo‘q.</div>
-        ) : notifications.map((notification) => (
-          <div key={notification.id} className={`rounded-3xl border p-4 ${notification.read ? 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300' : 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100'}`}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold">{notification.title}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{notification.message}</p>
-              </div>
-              <span className="text-[11px] uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">{new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService, onQr, onCancelOrder, onAcknowledge, onCancelItem }: any) {
+function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService, onAcknowledge }: any) {
   const runningMinutes = order?.status === 'confirmed' ? minutesSince(order.confirmedAt || order.startAt) : 0;
   const runningCost = order?.status === 'confirmed' ? Math.ceil((runningMinutes / 60) * Number(order.pricePerHour || table.pricePerHour)) + Number(order.total || 0) : 0;
   return (
@@ -817,10 +388,7 @@ function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService
       <div className={alerts.length ? 'pt-10' : ''}>
         <div className="flex items-start justify-between">
           <div><h3 className="text-lg font-semibold">{table.name}</h3><p className="text-sm text-slate-500">{table.type?.name || 'Tarifsiz'} · {formatCurrency(Number(table.pricePerHour))}/soat</p></div>
-          <div className="flex items-center gap-2">
-            <span className={`badge ${table.status === 'free' ? 'badge-success' : table.status === 'reserved' ? 'badge-warning' : 'badge-danger'}`}>{table.status === 'free' ? 'Bo‘sh' : table.status === 'reserved' ? 'Kutilmoqda' : 'Band'}</span>
-            <button className="btn-ghost rounded-2xl p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800" onClick={onQr}>QR</button>
-          </div>
+          <span className={`badge ${table.status === 'free' ? 'badge-success' : table.status === 'reserved' ? 'badge-warning' : 'badge-danger'}`}>{table.status === 'free' ? 'Bo‘sh' : table.status === 'reserved' ? 'Kutilmoqda' : 'Band'}</span>
         </div>
         {order ? (
           <div className="mt-4 space-y-3">
@@ -828,12 +396,7 @@ function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService
               <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800"><Clock size={16} /><p className="mt-1 font-semibold">{order.status === 'confirmed' ? `${runningMinutes} min` : 'Tasdiq kutyapti'}</p></div>
               <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800"><ReceiptText size={16} /><p className="mt-1 font-semibold">{formatCurrency(runningCost)}</p></div>
             </div>
-            {order.status === 'pending' ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button className="btn-success w-full rounded-2xl" onClick={() => onConfirm(order.id)}><Check size={16} /> Tasdiqlash</button>
-                <button className="btn-danger w-full rounded-2xl" onClick={() => onCancelOrder(order.id)}><Trash2 size={16} /> Bekor qilish</button>
-              </div>
-            ) : (
+            {order.status === 'pending' ? <button className="btn-success w-full rounded-2xl" onClick={() => onConfirm(order.id)}><Check size={16} /> Tasdiqlash</button> : (
               <div className="grid grid-cols-2 gap-2">
                 <button className="btn-secondary rounded-2xl" onClick={onService}><Plus size={16} /> Xizmat</button>
                 <button className="btn-danger rounded-2xl" onClick={() => onClose(order.id)}><Timer size={16} /> Yopish</button>
@@ -843,15 +406,7 @@ function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService
         ) : (
           <button className="mt-4 h-12 w-full rounded-2xl bg-slate-950 text-sm font-semibold text-white dark:bg-white dark:text-slate-950" onClick={onOpen}>Stolni ochish</button>
         )}
-        {alerts.length > 0 && <div className="mt-3 space-y-2">{alerts.map((item: any) => (
-          <div key={item.id} className="flex items-center justify-between rounded-2xl bg-red-50 p-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200">
-            <span>{item.quantity} x {item.extra?.name || item.name}</span>
-            <div className="flex gap-2">
-              <button onClick={() => onAcknowledge(item.id)} className="rounded-xl bg-red-600 px-3 py-1 font-semibold text-white">Qabul qildim</button>
-              <button onClick={() => onCancelItem(item.id)} className="rounded-xl bg-slate-200 px-3 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-100">Bekor</button>
-            </div>
-          </div>
-        ))}</div>}
+        {alerts.length > 0 && <div className="mt-3 space-y-2">{alerts.map((item: any) => <div key={item.id} className="flex items-center justify-between rounded-2xl bg-red-50 p-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200"><span>{item.quantity} x {item.extra?.name || item.name}</span><button onClick={() => onAcknowledge(item.id)} className="rounded-xl bg-red-600 px-3 py-1 font-semibold text-white">Qabul qildim</button></div>)}</div>}
       </div>
     </article>
   );

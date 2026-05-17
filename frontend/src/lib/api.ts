@@ -60,13 +60,12 @@ export const usersApi = {
 };
 
 export const publicApi = {
-  getTenants: (params?: any) => api.get('/v1/tenants/public', { params }),
+  getTenants: () => api.get('/v1/tenants/public'),
 };
 
 export const regionsApi = {
   getTree: () => api.get('/v1/regions/tree'),
   getAll: (params?: any) => api.get('/v1/regions', { params }),
-  create: (data: any) => api.post('/v1/regions', data),
 };
 
 export const servicesApi = {
@@ -77,25 +76,8 @@ export const billiardApi = {
   getClubs: (params?: any) => api.get('/v1/billiard/clubs', { params }),
   getClub: (id: string) => api.get(`/v1/billiard/clubs/${id}`),
   getTables: (clubId: string) => api.get(`/v1/billiard/clubs/${clubId}/tables`),
-  getExtras: (clubId: string) => api.get(`/v1/billiard/clubs/${clubId}/extras`),
   bookTable: (tableId: string, data: any) => api.post(`/v1/billiard/tables/${tableId}/book`, data),
-  getActiveOrderForTable: (tableId: string) => api.get(`/v1/billiard/tables/${tableId}/active-order`),
   getMyOrders: () => api.get('/v1/billiard/orders/my'),
-  requestExtra: (orderId: string, data: any) => api.post(`/v1/billiard/orders/${orderId}/request-extra`, data),
-  adminSnapshot: () => api.get('/v1/billiard/admin/snapshot'),
-  createType: (data: any) => api.post('/v1/billiard/admin/types', data),
-  createTable: (data: any) => api.post('/v1/billiard/admin/tables', data),
-  createExtra: (data: any) => api.post('/v1/billiard/admin/extras', data),
-  updateExtra: (id: string, data: any) => api.patch(`/v1/billiard/admin/extras/${id}`, data),
-  deleteExtra: (id: string) => api.delete(`/v1/billiard/admin/extras/${id}`),
-  openTable: (id: string) => api.post(`/v1/billiard/admin/tables/${id}/open`),
-  getAnalytics: () => api.get('/v1/billiard/admin/analytics'),
-  confirmOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/confirm`),
-  addOrderItem: (id: string, data: any) => api.post(`/v1/billiard/orders/${id}/items`, data),
-  acknowledgeItem: (id: string) => api.post(`/v1/billiard/items/${id}/acknowledge`),
-  cancelOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/cancel`),
-  cancelItem: (id: string) => api.post(`/v1/billiard/orders/items/${id}/cancel`),
-  closeOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/close`),
 };
 
 export const tenantsApi = {

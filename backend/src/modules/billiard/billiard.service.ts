@@ -1,14 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository } from 'typeorm';
-import { UserRole } from '../../common/enums/role.enum';
+import { Repository } from 'typeorm';
 import { BilliardClub } from './billiard-club.entity';
 import { BilliardTable, BilliardTableStatus } from './billiard-table.entity';
 import { BilliardOrder, BilliardOrderStatus } from './billiard-order.entity';
 import { BilliardTableType } from './billiard-table-type.entity';
 import { BilliardExtra } from './billiard-extra.entity';
-import { BilliardOrderItem, BilliardOrderItemStatus } from './billiard-order-item.entity';
-import { BilliardGateway } from './billiard.gateway';
+import { BilliardOrderItem } from './billiard-order-item.entity';
 
 @Injectable()
 export class BilliardService {
@@ -25,10 +23,9 @@ export class BilliardService {
     private readonly extraRepo: Repository<BilliardExtra>,
     @InjectRepository(BilliardOrderItem)
     private readonly itemRepo: Repository<BilliardOrderItem>,
-    private readonly gateway: BilliardGateway,
   ) {}
 
-  async findClubs(regionId?: string, serviceSlug?: string, city?: string) {
+  async findClubs(regionId?: string, serviceSlug?: string) {
     const query = this.clubRepo.createQueryBuilder('club')
       .leftJoinAndSelect('club.region', 'region')
       .leftJoinAndSelect('club.service', 'service')
@@ -36,7 +33,6 @@ export class BilliardService {
 
     if (regionId) query.andWhere('club.regionId = :regionId', { regionId });
     if (serviceSlug) query.andWhere('service.slug = :serviceSlug', { serviceSlug });
-    if (city) query.andWhere('club.city = :city', { city });
 
     return query.orderBy('club.name', 'ASC').getMany();
   }
@@ -50,146 +46,7 @@ export class BilliardService {
   async findTables(clubId: string) {
     const club = await this.clubRepo.findOne({ where: { id: clubId, isActive: true } });
     if (!club) throw new NotFoundException('Club not found');
-    return this.tableRepo.find({ where: { clubId, isActive: true }, relations: ['type'], order: { name: 'ASC' } });
-  }
-
-  async findAdminClub(tenantId: string) {
-    const club = await this.clubRepo.findOne({ where: { tenantId, isActive: true }, relations: ['region'] });
-    if (!club) throw new NotFoundException('Billiard tashkiloti topilmadi');
-    return club;
-  }
-
-  async findAdminSnapshot(tenantId: string) {
-    const club = await this.findAdminClub(tenantId);
-    const [tables, types, extras, orders, pendingItems] = await Promise.all([
-      this.tableRepo.find({ where: { clubId: club.id, isActive: true }, relations: ['type'], order: { name: 'ASC' } }),
-      this.typeRepo.find({ where: { clubId: club.id }, order: { name: 'ASC' } }),
-      this.extraRepo.find({ where: { clubId: club.id, isActive: true }, order: { name: 'ASC' } }),
-      this.orderRepo.find({
-        where: [
-          { clubId: club.id, status: BilliardOrderStatus.PENDING },
-          { clubId: club.id, status: BilliardOrderStatus.CONFIRMED },
-        ],
-        relations: ['table', 'user'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.itemRepo.find({
-        where: { status: BilliardOrderItemStatus.PENDING },
-        relations: ['order', 'order.table', 'extra'],
-        order: { createdAt: 'DESC' },
-      }),
-    ]);
-
-    return {
-      club,
-      tables,
-      types,
-      extras,
-      orders,
-      pendingItems: pendingItems.filter((item) => item.order?.clubId === club.id),
-    };
-  }
-
-  async createType(tenantId: string, dto: { name: string; tier?: string; details?: string; pricePerHour: number }) {
-    const club = await this.findAdminClub(tenantId);
-    const type = await this.typeRepo.save(this.typeRepo.create({
-      clubId: club.id,
-      name: dto.name,
-      tier: dto.tier || dto.name.toLowerCase(),
-      details: dto.details,
-      pricePerHour: Number(dto.pricePerHour || 0),
-    }));
-    this.gateway.emitClub(club.id, 'catalog-updated', { kind: 'type', type });
-    return type;
-  }
-
-  async createTable(tenantId: string, dto: { name: string; capacity?: number; pricePerHour: number; typeId?: string }) {
-    const club = await this.findAdminClub(tenantId);
-    const table = await this.tableRepo.save(this.tableRepo.create({
-      clubId: club.id,
-      name: dto.name,
-      capacity: dto.capacity || 4,
-      typeId: dto.typeId || null,
-      pricePerHour: Number(dto.pricePerHour || 0),
-      status: BilliardTableStatus.FREE,
-    }));
-    this.gateway.emitClub(club.id, 'table-updated', table);
-    return table;
-  }
-
-  async createExtra(tenantId: string, dto: { name: string; category?: string; price: number; stockQuantity?: number; alertThreshold?: number; image?: string }) {
-    const club = await this.findAdminClub(tenantId);
-    const extra = await this.extraRepo.save(this.extraRepo.create({
-      clubId: club.id,
-      name: dto.name,
-      category: dto.category,
-      price: Number(dto.price || 0),
-      stockQuantity: Number(dto.stockQuantity || 0),
-      alertThreshold: Number(dto.alertThreshold || 0),
-      image: dto.image,
-    }));
-    this.gateway.emitClub(club.id, 'catalog-updated', { kind: 'extra', extra });
-    return extra;
-  }
-
-  async updateExtraStock(tenantId: string, extraId: string, dto: { addQuantity?: number; stockQuantity?: number; price?: number; alertThreshold?: number; image?: string; name?: string; category?: string }) {
-    const club = await this.findAdminClub(tenantId);
-    const extra = await this.extraRepo.findOne({ where: { id: extraId, clubId: club.id } });
-    if (!extra) throw new NotFoundException('Ombor mahsuloti topilmadi');
-
-    if (dto.addQuantity !== undefined) extra.stockQuantity = Number(extra.stockQuantity || 0) + Number(dto.addQuantity || 0);
-    if (dto.stockQuantity !== undefined) extra.stockQuantity = Number(dto.stockQuantity || 0);
-    if (dto.price !== undefined) extra.price = Number(dto.price || 0);
-    if (dto.alertThreshold !== undefined) extra.alertThreshold = Number(dto.alertThreshold || 0);
-    if (dto.image !== undefined) extra.image = dto.image;
-    if (dto.name !== undefined) extra.name = dto.name;
-    if (dto.category !== undefined) extra.category = dto.category;
-
-    const saved = await this.extraRepo.save(extra);
-    this.gateway.emitClub(club.id, 'inventory-updated', saved);
-    return saved;
-  }
-
-  async deleteExtra(tenantId: string, extraId: string) {
-    const club = await this.findAdminClub(tenantId);
-    const extra = await this.extraRepo.findOne({ where: { id: extraId, clubId: club.id } });
-    if (!extra) throw new NotFoundException('Ombor mahsuloti topilmadi');
-    extra.isActive = false;
-    const deleted = await this.extraRepo.save(extra);
-    this.gateway.emitClub(club.id, 'inventory-updated', deleted);
-    return { message: 'Mahsulot o‘chirildi' };
-  }
-
-  async findExtras(clubId: string) {
-    return this.extraRepo.find({ where: { clubId, isActive: true }, order: { name: 'ASC' } });
-  }
-
-  async openTableByAdmin(tenantId: string, adminId: string, tableId: string) {
-    const club = await this.findAdminClub(tenantId);
-    const table = await this.tableRepo.findOne({ where: { id: tableId, clubId: club.id, isActive: true } });
-    if (!table) throw new NotFoundException('Stol topilmadi');
-    if (table.status !== BilliardTableStatus.FREE) throw new BadRequestException('Stol bo‘sh emas');
-
-    const now = new Date();
-    const order = await this.orderRepo.save(this.orderRepo.create({
-      userId: adminId,
-      clubId: club.id,
-      tableId: table.id,
-      status: BilliardOrderStatus.CONFIRMED,
-      startAt: now,
-      confirmedAt: now,
-      endAt: null,
-      durationMinutes: 0,
-      pricePerHour: Number(table.pricePerHour),
-      total: 0,
-      note: 'Admin tomonidan ochildi',
-    }));
-
-    table.status = BilliardTableStatus.OCCUPIED;
-    await this.tableRepo.save(table);
-    this.gateway.emitClub(club.id, 'booking-confirmed', order);
-    this.gateway.emitClub(club.id, 'table-updated', table);
-    return order;
+    return this.tableRepo.find({ where: { clubId, isActive: true }, order: { name: 'ASC' } });
   }
 
   async bookTable(userId: string, tableId: string, startAt: Date, durationMinutes: number, note?: string) {
@@ -204,6 +61,7 @@ export class BilliardService {
 
     const start = startAt instanceof Date ? startAt : new Date(startAt);
     const end = new Date(start.getTime() + durationMinutes * 60000);
+    const total = Number((Number(table.pricePerHour) * (durationMinutes / 60)).toFixed(2));
 
     const order = this.orderRepo.create({
       userId,
@@ -214,20 +72,17 @@ export class BilliardService {
       endAt: end,
       durationMinutes,
       pricePerHour: Number(table.pricePerHour),
-      total: 0,
+      total,
       note,
     });
 
     table.status = BilliardTableStatus.RESERVED;
     await this.tableRepo.save(table);
-    const saved = await this.orderRepo.save(order);
-    this.gateway.emitClub(club.id, 'booking-requested', { order: saved, table });
-    this.gateway.emitClub(club.id, 'table-updated', table);
-    return saved;
+    return this.orderRepo.save(order);
   }
 
   async findMyOrders(userId: string) {
-    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club', 'items', 'items.extra'] });
+    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club'] });
   }
 
   // Admin: list pending orders for a club
@@ -246,102 +101,37 @@ export class BilliardService {
     await this.tableRepo.save(table);
 
     order.status = BilliardOrderStatus.CONFIRMED;
-    order.confirmedAt = new Date();
-    order.startAt = order.confirmedAt;
-    order.endAt = null;
     await this.orderRepo.save(order);
-    this.gateway.emitClub(order.clubId, 'booking-confirmed', order);
-    this.gateway.emitClub(order.clubId, 'table-updated', table);
     return order;
   }
 
   // Add extra item to order
-  async addOrderItem(orderId: string, extraId: string, quantity = 1, status = BilliardOrderItemStatus.ACCEPTED, note?: string) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table'] });
+  async addOrderItem(orderId: string, extraId: string, quantity = 1) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
     if (order.status === BilliardOrderStatus.CANCELLED || order.status === BilliardOrderStatus.COMPLETED) {
       throw new BadRequestException('Order is closed');
     }
     const extra = await this.extraRepo.findOne({ where: { id: extraId } });
     if (!extra) throw new NotFoundException('Extra not found');
-    if (status === BilliardOrderItemStatus.ACCEPTED && Number(extra.stockQuantity || 0) < quantity) {
-      throw new BadRequestException(`${extra.name} omborda yetarli emas`);
-    }
 
-    const item = this.itemRepo.create({
-      orderId: order.id,
-      extraId: extra.id,
-      name: extra.name,
-      quantity,
-      price: status === BilliardOrderItemStatus.ACCEPTED ? Number(extra.price) : 0,
-      note,
-      status,
-    });
+    const item = this.itemRepo.create({ orderId: order.id, extraId: extra.id, quantity, price: Number(extra.price) });
     await this.itemRepo.save(item);
 
-    if (status === BilliardOrderItemStatus.ACCEPTED) {
-      extra.stockQuantity = Number(extra.stockQuantity || 0) - quantity;
-      await this.extraRepo.save(extra);
-      order.total = Number((Number(order.total) + Number(extra.price) * quantity).toFixed(2));
-      await this.orderRepo.save(order);
-      this.gateway.emitClub(order.clubId, 'bill-updated', order);
-      this.gateway.emitClub(order.clubId, 'inventory-updated', extra);
-    } else {
-      this.gateway.emitClub(order.clubId, 'extra-requested', { item, order });
-    }
-    return item;
-  }
-
-  async requestExtra(orderId: string, extraId: string, quantity = 1, note?: string) {
-    return this.addOrderItem(orderId, extraId, quantity, BilliardOrderItemStatus.PENDING, note);
-  }
-
-  async acknowledgeItem(itemId: string) {
-    const item = await this.itemRepo.findOne({ where: { id: itemId }, relations: ['order', 'order.table', 'extra'] });
-    if (!item) throw new NotFoundException('Item not found');
-    if (item.status === BilliardOrderItemStatus.ACCEPTED) return item;
-
-    item.status = BilliardOrderItemStatus.ACCEPTED;
-    item.price = Number(item.extra?.price || item.price || 0);
-    item.name = item.name || item.extra?.name || 'Qo‘shimcha buyurtma';
-    if (Number(item.extra?.stockQuantity || 0) < item.quantity) {
-      throw new BadRequestException(`${item.extra?.name || item.name} omborda yetarli emas`);
-    }
-    item.extra.stockQuantity = Number(item.extra.stockQuantity || 0) - item.quantity;
-    await this.extraRepo.save(item.extra);
-    await this.itemRepo.save(item);
-
-    const order = item.order;
-    order.total = Number((Number(order.total) + Number(item.price) * item.quantity).toFixed(2));
+    // update order total
+    order.total = Number((Number(order.total) + Number(extra.price) * quantity).toFixed(2));
     await this.orderRepo.save(order);
-    this.gateway.emitClub(order.clubId, 'extra-accepted', { item, order });
-    this.gateway.emitClub(order.clubId, 'inventory-updated', item.extra);
     return item;
-  }
-
-  async findActiveOrderForTable(tableId: string, userId?: string) {
-    const where: any = { tableId, status: BilliardOrderStatus.CONFIRMED };
-    if (userId) where.userId = userId;
-    const order = await this.orderRepo.findOne({ where, relations: ['table', 'club'] });
-    if (!order) throw new NotFoundException('Faol sessiya topilmadi');
-    const items = await this.itemRepo.find({ where: { orderId: order.id, status: BilliardOrderItemStatus.ACCEPTED }, relations: ['extra'] });
-    return { order, items };
   }
 
   // Close order: calculate final total and free the table
-  async closeOrder(orderId: string, actorId: string, actorRole: string) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table', 'user'] });
+  async closeOrder(orderId: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table'] });
     if (!order) throw new NotFoundException('Order not found');
     if (order.status === BilliardOrderStatus.COMPLETED) throw new BadRequestException('Order already closed');
-    if (actorRole !== UserRole.BILLIARD_ADMIN && actorRole !== UserRole.SUPERADMIN && actorId !== order.userId) {
-      throw new ForbiddenException('You are not allowed to close this order');
-    }
 
     // compute price for duration
-    const closedAt = new Date();
-    const startedAt = order.confirmedAt || order.startAt || order.createdAt;
-    const durationMinutes = Math.max(1, Math.ceil((closedAt.getTime() - new Date(startedAt).getTime()) / 60000));
-    const durationHours = durationMinutes / 60;
+    const durationHours = (order.durationMinutes || 60) / 60;
     const base = Number(order.pricePerHour || 0) * durationHours;
 
     // sum items
@@ -351,106 +141,13 @@ export class BilliardService {
     const finalTotal = Number((base + extrasTotal).toFixed(2));
     order.total = finalTotal;
     order.status = BilliardOrderStatus.COMPLETED;
-    order.durationMinutes = durationMinutes;
-    order.closedAt = closedAt;
-    order.endAt = closedAt;
     await this.orderRepo.save(order);
 
     // free table
     const table = order.table;
     table.status = BilliardTableStatus.FREE;
     await this.tableRepo.save(table);
-    this.gateway.emitClub(order.clubId, 'order-closed', { order, items, finalTotal });
-    this.gateway.emitClub(order.clubId, 'table-updated', table);
 
     return { order, items, finalTotal };
-  }
-
-  async cancelOrder(orderId: string, actorId: string, actorRole: string) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: ['table', 'user'] });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== BilliardOrderStatus.PENDING) throw new BadRequestException('Only pending orders can be cancelled');
-    if (actorRole !== UserRole.BILLIARD_ADMIN && actorRole !== UserRole.SUPERADMIN && actorId !== order.userId) {
-      throw new ForbiddenException('You are not allowed to cancel this order');
-    }
-
-    order.status = BilliardOrderStatus.CANCELLED;
-    await this.orderRepo.save(order);
-
-    const table = order.table;
-    table.status = BilliardTableStatus.FREE;
-    await this.tableRepo.save(table);
-    this.gateway.emitClub(order.clubId, 'booking-cancelled', order);
-    this.gateway.emitClub(order.clubId, 'table-updated', table);
-    return order;
-  }
-
-  async cancelItem(itemId: string, actorId: string, actorRole: string) {
-    const item = await this.itemRepo.findOne({ where: { id: itemId }, relations: ['order', 'order.user'] });
-    if (!item) throw new NotFoundException('Item not found');
-    if (item.status !== BilliardOrderItemStatus.PENDING) throw new BadRequestException('Only pending extra requests can be cancelled');
-    if (actorRole !== UserRole.BILLIARD_ADMIN && actorRole !== UserRole.SUPERADMIN && actorId !== item.order.userId) {
-      throw new ForbiddenException('You are not allowed to cancel this request');
-    }
-
-    const order = item.order;
-    await this.itemRepo.remove(item);
-    this.gateway.emitClub(order.clubId, 'extra-cancelled', { item, order });
-    return { cancelled: true };
-  }
-
-  async getAnalytics(tenantId: string) {
-    const club = await this.findAdminClub(tenantId);
-    const archiveFrom = new Date();
-    archiveFrom.setFullYear(archiveFrom.getFullYear() - 5);
-
-    const orders = await this.orderRepo.find({
-      where: { clubId: club.id, status: BilliardOrderStatus.COMPLETED, closedAt: MoreThanOrEqual(archiveFrom) },
-      relations: ['table', 'user'],
-      order: { closedAt: 'DESC' },
-    });
-
-    const byTable = new Map<string, any>();
-    const byUser = new Map<string, any>();
-    for (const order of orders) {
-      const tableKey = order.tableId;
-      const tableCurrent = byTable.get(tableKey) || {
-        tableId: tableKey,
-        tableName: order.table?.name || 'Stol',
-        sessions: 0,
-        minutes: 0,
-        revenue: 0,
-      };
-      tableCurrent.sessions += 1;
-      tableCurrent.minutes += Number(order.durationMinutes || 0);
-      tableCurrent.revenue += Number(order.total || 0);
-      byTable.set(tableKey, tableCurrent);
-
-      const userKey = order.userId || 'unknown';
-      const userLabel = order.user ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() || order.user.phone : 'Mijoz';
-      const userCurrent = byUser.get(userKey) || {
-        userId: userKey,
-        userName: userLabel,
-        sessions: 0,
-        minutes: 0,
-        revenue: 0,
-      };
-      userCurrent.sessions += 1;
-      userCurrent.minutes += Number(order.durationMinutes || 0);
-      userCurrent.revenue += Number(order.total || 0);
-      byUser.set(userKey, userCurrent);
-    }
-
-    return {
-      archiveYears: 5,
-      totals: {
-        sessions: orders.length,
-        minutes: orders.reduce((s, o) => s + Number(o.durationMinutes || 0), 0),
-        revenue: orders.reduce((s, o) => s + Number(o.total || 0), 0),
-      },
-      byTable: Array.from(byTable.values()).sort((a, b) => b.revenue - a.revenue),
-      byUser: Array.from(byUser.values()).sort((a, b) => b.revenue - a.revenue),
-      archive: orders,
-    };
   }
 }
