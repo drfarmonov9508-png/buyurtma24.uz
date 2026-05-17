@@ -18,12 +18,15 @@
     overscroll-behavior: none;
     -webkit-text-size-adjust: 100%;
     touch-action: manipulation;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-slate-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
     font-family: 'Inter', system-ui, sans-serif;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+    min-height: 100vh;
   }
   ::-webkit-scrollbar { @apply w-1.5 h-1.5; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
@@ -31,19 +34,19 @@
 }
 
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn { @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm; }
   .btn-primary { @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500; }
   .btn-secondary { @apply btn bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 focus:ring-gray-400; }
   .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500; }
   .btn-success { @apply btn bg-green-600 text-white hover:bg-green-700 focus:ring-green-500; }
   .btn-ghost { @apply btn bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-gray-400; }
-  .btn-brand { @apply btn bg-brand text-white hover:bg-brand-600 focus:ring-brand-500; }
+  .btn-brand { @apply btn bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500; }
   .btn-sm { @apply text-sm px-3 py-1.5; }
   .btn-lg { @apply text-lg px-6 py-3; }
-  .btn-icon { @apply p-2 rounded-lg; }
+  .btn-icon { @apply p-2 rounded-xl; }
 
-  .card { @apply bg-white dark:bg-slate-950 rounded-[28px] shadow-[0_20px_60px_-30px_rgba(15,23,42,0.4)] border border-gray-200/80 dark:border-gray-800; }
-  .card-hover { @apply card hover:shadow-[0_24px_80px_-40px_rgba(15,23,42,0.5)] transition-shadow duration-300 cursor-pointer; }
+  .card { @apply bg-white dark:bg-slate-950 rounded-[28px] shadow-[0_20px_60px_-30px_rgba(15,23,42,0.14)] border border-gray-200/70 dark:border-gray-800; }
+  .card-hover { @apply card hover:shadow-[0_24px_80px_-40px_rgba(15,23,42,0.2)] transition-shadow duration-300 cursor-pointer; }
 
   .input { @apply w-full px-4 py-3 rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all; }
   .label { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5; }
@@ -61,12 +64,14 @@
   .table-cell { @apply px-4 py-3 text-sm text-gray-900 dark:text-gray-200; }
   .table-row { @apply border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors; }
 
-  .sidebar-item { @apply flex items-center gap-3 px-4 py-3 rounded-[26px] text-sm font-semibold transition-all duration-200; }
-  .sidebar-item-active { @apply sidebar-item bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/20; }
-  .sidebar-item-inactive { @apply sidebar-item text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800; }
+  .sidebar-item { @apply flex items-center gap-3 px-4 py-3 min-h-[3rem] rounded-[24px] text-sm font-semibold transition-all duration-300; }
+  .sidebar-item-active { @apply sidebar-item bg-gradient-to-r from-slate-900 via-indigo-600 to-violet-600 text-white shadow-[0_18px_40px_-24px_rgba(79,70,229,0.65)]; }
+  .sidebar-item-inactive { @apply sidebar-item text-slate-700 bg-white/95 hover:bg-slate-100 dark:text-slate-300 dark:bg-gray-950/95 dark:hover:bg-gray-800; }
 
-  .page-header { @apply flex items-center justify-between mb-6; }
-  .page-title { @apply text-2xl font-bold text-gray-900 dark:text-white; }
+  .page-header { @apply flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6; }
+  .page-title { @apply text-3xl font-bold text-gray-900 dark:text-white; }
+  .card-title { @apply text-lg font-semibold text-gray-900 dark:text-white; }
+  .card-description { @apply text-sm text-slate-500 dark:text-slate-400; }
 
   .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-2xl; }
 }
@@ -74,6 +79,8 @@
 @layer utilities {
   .animate-fade-in { animation: fadeIn 0.2s ease-in-out; }
   .animate-slide-in { animation: slideIn 0.3s ease-out; }
+  .no-scrollbar::-webkit-scrollbar { @apply hidden; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 @keyframes fadeIn {

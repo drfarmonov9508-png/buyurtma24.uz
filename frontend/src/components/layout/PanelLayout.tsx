@@ -21,7 +21,7 @@ export default function PanelLayout({ children, title, allowedRoles }: PanelLayo
     if (!isAuthenticated) {
       fetchMe();
     }
-  }, []);
+  }, [fetchMe, isAuthenticated]);
 
   useEffect(() => {
     const normalizedAllowedRoles = allowedRoles.map((role) => role.toLowerCase());
@@ -32,17 +32,19 @@ export default function PanelLayout({ children, title, allowedRoles }: PanelLayo
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
-      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)} />}
+    <div className="relative flex min-h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 lg:hidden transition-opacity duration-300" onClick={() => setMobileOpen(false)} />
+      )}
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar title={title} onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 animate-fade-in">
           {children}

@@ -33,37 +33,39 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Mobile overlay */}
+    <div className="relative flex min-h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
       {mobileOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden transition-opacity duration-300" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={cn(
-        'h-screen flex flex-col bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300 z-50',
-        collapsed ? 'w-16' : 'w-64',
-        'max-lg:fixed max-lg:left-0 max-lg:top-0',
+        'h-screen flex flex-col overflow-hidden border-r border-gray-100 bg-white/95 backdrop-blur-xl transition-all duration-300 ease-out dark:border-gray-800 dark:bg-slate-950/95',
+        collapsed ? 'w-20' : 'w-72',
+        'lg:relative',
+        'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:h-screen',
         mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
       )}>
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800">
           {!collapsed && (
             <Link href="/client" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-slate-950 dark:bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <span className="text-[11px] font-black text-white dark:text-slate-950">B24</span>
+              <div className="w-10 h-10 flex items-center justify-center rounded-3xl bg-slate-950 text-sm font-black text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950">
+                B24
               </div>
-              <span className="font-extrabold text-gray-950 dark:text-white">Buyurtma24</span>
+              <div>
+                <p className="font-semibold text-slate-950 dark:text-white">Buyurtma24</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Mijoz paneli</p>
+              </div>
             </Link>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 ml-auto max-lg:hidden"
+            className="hidden rounded-xl p-1.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-gray-800 lg:inline-flex"
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-2">
           {CLIENT_NAV.map(({ href, key, label, icon: Icon }) => {
             const baseHref = href.split('?')[0];
             const isActive = pathname === baseHref || (baseHref !== '/client' && pathname.startsWith(baseHref));
@@ -85,19 +87,19 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           })}
         </nav>
 
-        <div className="p-2 border-t border-gray-100 dark:border-gray-800">
+        <div className="p-3 border-t border-gray-100 dark:border-gray-800">
           {!collapsed && user && (
-            <div className="px-3 py-2 mb-2 rounded-xl bg-gray-50 dark:bg-gray-800">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            <div className="rounded-3xl bg-slate-50 px-3 py-3 dark:bg-gray-900">
+              <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
                 {user.firstName} {user.lastName}
               </p>
-              <p className="text-xs text-gray-400 truncate">{user.phone}</p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.phone}</p>
             </div>
           )}
           <button
             onClick={handleLogout}
             className={cn(
-              'sidebar-item-inactive w-full',
+              'sidebar-item-inactive mt-3 w-full',
               collapsed && 'justify-center px-2'
             )}
           >
@@ -107,11 +109,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
-        {/* Mobile header */}
+      <main className="flex-1 overflow-y-auto lg:ml-0 xl:ml-0">
         <div className="lg:hidden flex items-center h-14 px-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-          <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+          <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
             <Menu size={22} />
           </button>
           <span className="ml-3 font-bold text-gray-900 dark:text-white">Buyurtma24</span>

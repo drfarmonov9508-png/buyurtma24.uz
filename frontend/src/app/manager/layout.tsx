@@ -34,15 +34,16 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="relative flex min-h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
       {mobileOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300" onClick={() => setMobileOpen(false)} />
       )}
 
       <aside className={cn(
         'h-screen flex flex-col bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300 z-50',
         collapsed ? 'w-16' : 'w-64',
-        'max-lg:fixed max-lg:left-0 max-lg:top-0',
+        'lg:relative',
+        'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:h-screen',
         mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
       )}>
         {/* Logo */}
@@ -60,14 +61,14 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 ml-auto max-lg:hidden"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 ml-auto lg:inline-flex hidden"
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-2">
           {NAV.map(({ href, label, icon: Icon, exact }) => {
             const isActive = exact ? pathname === href : pathname.startsWith(href);
             return (
@@ -89,18 +90,21 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
         </nav>
 
         {/* User + logout */}
-        <div className="p-2 border-t border-gray-100 dark:border-gray-800">
+        <div className="p-3 border-t border-gray-100 dark:border-gray-800">
           {!collapsed && user && (
-            <div className="px-3 py-2 mb-2 rounded-xl bg-gray-50 dark:bg-gray-800">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            <div className="rounded-3xl bg-slate-50 px-3 py-3 dark:bg-gray-900">
+              <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                 {user.firstName} {user.lastName}
               </p>
-              <p className="text-xs text-indigo-500 font-medium">Ish yurituvchi</p>
+              <p className="truncate text-xs text-indigo-500 dark:text-indigo-300">Ish yurituvchi</p>
             </div>
           )}
           <button
             onClick={handleLogout}
-            className={cn('sidebar-item-inactive w-full', collapsed && 'justify-center px-2')}
+            className={cn(
+              'sidebar-item-inactive mt-3 w-full',
+              collapsed && 'justify-center px-2'
+            )}
           >
             <LogOut size={18} className="text-red-400 flex-shrink-0" />
             {!collapsed && <span className="text-red-500">Chiqish</span>}
@@ -108,9 +112,9 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto lg:ml-0">
         <div className="lg:hidden flex items-center h-14 px-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-          <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+          <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
             <Menu size={22} />
           </button>
           <span className="ml-3 font-bold text-gray-900 dark:text-white">Buyurtma24</span>

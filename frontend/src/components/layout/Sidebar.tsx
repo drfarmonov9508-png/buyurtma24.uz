@@ -39,9 +39,9 @@ const ADMIN_NAV: NavItem[] = [
 
 const BILLIARD_NAV: NavItem[] = [
   { href: '/billiard-admin?view=dashboard', key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/billiard-admin?view=tables', key: 'tables', icon: Table2, label: "Stollar" },
-  { href: '/billiard-admin?view=inventory', key: 'inventory', icon: Package, label: "Ombor" },
-  { href: '/billiard-admin?view=analytics', key: 'analytics', icon: BarChart2, label: "Tahlil" },
+  { href: '/billiard-admin?view=tables', key: 'tables', icon: Table2, label: 'Stollar' },
+  { href: '/billiard-admin?view=inventory', key: 'inventory', icon: Package, label: 'Ombor' },
+  { href: '/billiard-admin?view=analytics', key: 'analytics', icon: BarChart2, label: 'Tahlil' },
 ];
 
 const CASHIER_NAV: NavItem[] = [
@@ -77,6 +77,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileO
   const [collapsed, setCollapsed] = useState(false);
 
   const navItems = NAV_MAP[user?.role?.toLowerCase() || ''] || [];
+  const roleLabel = user?.role?.replace(/_/g, ' ') || 'Platforma';
 
   const handleLogout = async () => {
     await logout();
@@ -86,80 +87,91 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileO
 
   return (
     <aside className={cn(
-      'h-screen flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur border-r border-gray-100 dark:border-gray-800 transition-all duration-300 z-50',
-      collapsed ? 'w-16' : 'w-64',
-      'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:w-72 max-lg:shadow-2xl',
+      'h-screen flex flex-col overflow-hidden border-r border-gray-100 bg-white/96 backdrop-blur-xl transition-all duration-300 ease-out dark:border-gray-800 dark:bg-slate-950/95',
+      collapsed ? 'w-20' : 'w-72',
+      'lg:relative',
+      'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:h-screen',
       mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
     )}>
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 dark:border-gray-800">
-        {!collapsed && (
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-slate-950 dark:bg-white rounded-xl flex items-center justify-center shadow-sm">
-              <span className="text-[11px] font-black text-white dark:text-slate-950">B24</span>
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+          <Link href="/" className={cn('flex items-center gap-3 transition', collapsed && 'justify-center')}>
+            <div className="flex h-11 w-11 items-center justify-center rounded-3xl bg-slate-950 text-sm font-black text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950">
+              B24
             </div>
-            <span className="font-extrabold text-gray-950 dark:text-white">Buyurtma24</span>
+            {!collapsed && (
+              <div>
+                <p className="text-sm font-semibold text-slate-950 dark:text-white">Buyurtma24</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">{roleLabel}</p>
+              </div>
+            )}
           </Link>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 ml-auto max-lg:hidden"
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-        <button
-          onClick={onMobileClose}
-          className="hidden max-lg:block p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
-        >
-          <X size={18} />
-        </button>
-      </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-        {navItems.map(({ href, key, icon: Icon, label }) => {
-          const labelText = (tr.nav as Record<string, string>)[key] ?? label ?? key;
-          const currentView = searchParams.get('view');
-          const targetView = href.includes('?view=') ? href.split('?view=')[1] : undefined;
-          const isActive = (pathname === href.split('?')[0]
-            && (!targetView || currentView === targetView))
-            || (pathname.startsWith(href.split('?')[0]) && href === pathname);
-
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onMobileClose}
-              className={cn(
-                isActive ? 'sidebar-item-active' : 'sidebar-item-inactive',
-                collapsed && 'justify-center px-2'
-              )}
-              title={collapsed ? label : undefined}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="hidden rounded-xl p-1.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-gray-800 lg:inline-flex"
+              aria-label="Toggle sidebar"
             >
-              <Icon size={18} className="flex-shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="p-2 border-t border-gray-100 dark:border-gray-800">
-        {!collapsed && user && (
-          <div className="px-3 py-2 mb-2 rounded-xl bg-gray-50 dark:bg-gray-800">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {user.firstName} {user.lastName}
-            </p>
-            <p className="text-xs text-gray-400 truncate">{user.role}</p>
+              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </button>
+            <button
+              onClick={onMobileClose}
+              className="rounded-xl p-1.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-gray-800 lg:hidden"
+              aria-label="Close menu"
+            >
+              <X size={18} />
+            </button>
           </div>
-        )}
-        <button
-          onClick={handleLogout}
-          className={cn(
-            'sidebar-item-inactive w-full',
-            collapsed && 'justify-center px-2'
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-2">
+          {navItems.map(({ href, key, icon: Icon, label }) => {
+            const labelText = (tr.nav as Record<string, string>)[key] ?? label ?? key;
+            const currentView = searchParams.get('view');
+            const targetView = href.includes('?view=') ? href.split('?view=')[1] : undefined;
+            const isActive = (pathname === href.split('?')[0]
+              && (!targetView || currentView === targetView))
+              || (pathname.startsWith(href.split('?')[0]) && href === pathname);
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onMobileClose}
+                className={cn(
+                  isActive ? 'sidebar-item-active' : 'sidebar-item-inactive',
+                  collapsed && 'justify-center px-2'
+                )}
+                title={collapsed ? labelText : undefined}
+              >
+                <Icon size={18} className="flex-shrink-0" />
+                {!collapsed && <span>{labelText}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-3 border-t border-gray-100 dark:border-gray-800">
+          {!collapsed && user && (
+            <div className="rounded-3xl bg-slate-50 px-3 py-3 dark:bg-gray-900">
+              <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                {user.firstName} {user.lastName}
+              </p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.role}</p>
+            </div>
           )}
-        >
-          <LogOut size={18} className="text-red-400 flex-shrink-0" />
-          {!collapsed && <span className="text-red-500">{tr.auth.logout}</span>}
-        </button>
+          <button
+            onClick={handleLogout}
+            className={cn(
+              'sidebar-item-inactive mt-3 w-full',
+              collapsed && 'justify-center px-2'
+            )}
+          >
+            <LogOut size={18} className="text-red-400 flex-shrink-0" />
+            {!collapsed && <span className="text-red-500">{tr.auth.logout}</span>}
+          </button>
+        </div>
       </div>
     </aside>
   );

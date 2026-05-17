@@ -94,16 +94,16 @@ export default function SportPage() {
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block min-w-[220px]">
+                <label className="block w-full">
                   <span className="label">Viloyat</span>
-                  <select value={selectedRegion} onChange={(e) => changeRegion(e.target.value)} className="input h-11 rounded-2xl">
+                  <select value={selectedRegion} onChange={(e) => changeRegion(e.target.value)} className="input h-11 w-full rounded-2xl">
                     <option value="">Barcha viloyatlar</option>
                     {regions.map((reg) => <option key={reg.id} value={reg.id}>{reg.name}</option>)}
                   </select>
                 </label>
-                <label className="block min-w-[220px]">
+                <label className="block w-full">
                   <span className="label">Shahar/Tuman</span>
-                  <select value={selectedCity} onChange={(e) => changeCity(e.target.value)} className="input h-11 rounded-2xl" disabled={!selectedRegion}>
+                  <select value={selectedCity} onChange={(e) => changeCity(e.target.value)} className="input h-11 w-full rounded-2xl" disabled={!selectedRegion}>
                     <option value="">Barchasi</option>
                     {districts.map((district) => <option key={district.id} value={district.name}>{district.name}</option>)}
                   </select>
