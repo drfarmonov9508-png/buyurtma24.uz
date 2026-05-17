@@ -3,16 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../orders/order.entity';
 import { Tenant } from '../tenants/tenant.entity';
+import { BilliardOrder } from '../billiard/billiard-order.entity';
 
 @Injectable()
 export class ClientService {
   constructor(
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>,
+    @InjectRepository(BilliardOrder) private billiardOrderRepo: Repository<BilliardOrder>,
   ) {}
 
   async getOrderHistory(userId: string, page = 1, limit = 20) {
-    const [data, total] = await this.orderRepo
+    const [foodOrders, totalFood] = await this.orderRepo
       .createQueryBuilder('o')
       .leftJoinAndSelect('o.tenant', 'tenant')
       .leftJoinAndSelect('o.items', 'items')
@@ -22,6 +24,26 @@ export class ClientService {
       .take(limit)
       .getManyAndCount();
 
+    const billiardOrders = await this.billiardOrderRepo.find({
+      where: { userId },
+      relations: ['club', 'table', 'items', 'items.extra'],
+      order: { createdAt: 'DESC' },
+    });
+
+    const foodHistory = foodOrders.map((order: any) => ({ ...order, historyType: 'food' }));
+    const billiardHistory = billiardOrders.map((order: any) => ({
+      ...order,
+      historyType: 'billiard',
+      tenant: order.club ? { id: order.club.id, name: order.club.name, businessType: 'sport' } : null,
+      total: order.total,
+      items: order.items || [],
+    }));
+
+    const data = [...foodHistory, ...billiardHistory]
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+
+    const total = totalFood + billiardOrders.length;
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 

@@ -15,7 +15,7 @@ const CLIENT_NAV = [
   { href: '/client/places?type=food', key: 'food', label: 'Restoran & Kafelar', icon: Store },
   { href: '/client/places?type=market', key: 'market', label: 'Supermarketlar', icon: ShoppingBasket },
   { href: '/client/sport', key: 'sport', label: "Sport o'yinlari", icon: Dumbbell },
-  { href: '/client/history', key: 'history', label: 'Buyurtma tarixi', icon: History },
+  { href: '/client/history', key: 'history', label: 'Ilova tarixi', icon: History },
   { href: '/client/ratings', key: 'ratings', label: 'Baholarim', icon: Star },
 ];
 

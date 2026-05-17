@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { BilliardClub } from './billiard-club.entity';
 import { BilliardTable, BilliardTableStatus } from './billiard-table.entity';
 import { BilliardOrder, BilliardOrderStatus } from './billiard-order.entity';
@@ -116,20 +116,69 @@ export class BilliardService {
     return table;
   }
 
-  async createExtra(tenantId: string, dto: { name: string; category?: string; price: number }) {
+  async createExtra(tenantId: string, dto: { name: string; category?: string; price: number; stockQuantity?: number; alertThreshold?: number; image?: string }) {
     const club = await this.findAdminClub(tenantId);
     const extra = await this.extraRepo.save(this.extraRepo.create({
       clubId: club.id,
       name: dto.name,
       category: dto.category,
       price: Number(dto.price || 0),
+      stockQuantity: Number(dto.stockQuantity || 0),
+      alertThreshold: Number(dto.alertThreshold || 0),
+      image: dto.image,
     }));
     this.gateway.emitClub(club.id, 'catalog-updated', { kind: 'extra', extra });
     return extra;
   }
 
+  async updateExtraStock(tenantId: string, extraId: string, dto: { addQuantity?: number; stockQuantity?: number; price?: number; alertThreshold?: number; image?: string; name?: string; category?: string }) {
+    const club = await this.findAdminClub(tenantId);
+    const extra = await this.extraRepo.findOne({ where: { id: extraId, clubId: club.id } });
+    if (!extra) throw new NotFoundException('Ombor mahsuloti topilmadi');
+
+    if (dto.addQuantity !== undefined) extra.stockQuantity = Number(extra.stockQuantity || 0) + Number(dto.addQuantity || 0);
+    if (dto.stockQuantity !== undefined) extra.stockQuantity = Number(dto.stockQuantity || 0);
+    if (dto.price !== undefined) extra.price = Number(dto.price || 0);
+    if (dto.alertThreshold !== undefined) extra.alertThreshold = Number(dto.alertThreshold || 0);
+    if (dto.image !== undefined) extra.image = dto.image;
+    if (dto.name !== undefined) extra.name = dto.name;
+    if (dto.category !== undefined) extra.category = dto.category;
+
+    const saved = await this.extraRepo.save(extra);
+    this.gateway.emitClub(club.id, 'inventory-updated', saved);
+    return saved;
+  }
+
   async findExtras(clubId: string) {
     return this.extraRepo.find({ where: { clubId, isActive: true }, order: { name: 'ASC' } });
+  }
+
+  async openTableByAdmin(tenantId: string, adminId: string, tableId: string) {
+    const club = await this.findAdminClub(tenantId);
+    const table = await this.tableRepo.findOne({ where: { id: tableId, clubId: club.id, isActive: true } });
+    if (!table) throw new NotFoundException('Stol topilmadi');
+    if (table.status !== BilliardTableStatus.FREE) throw new BadRequestException('Stol bo‘sh emas');
+
+    const now = new Date();
+    const order = await this.orderRepo.save(this.orderRepo.create({
+      userId: adminId,
+      clubId: club.id,
+      tableId: table.id,
+      status: BilliardOrderStatus.CONFIRMED,
+      startAt: now,
+      confirmedAt: now,
+      endAt: null,
+      durationMinutes: 0,
+      pricePerHour: Number(table.pricePerHour),
+      total: 0,
+      note: 'Admin tomonidan ochildi',
+    }));
+
+    table.status = BilliardTableStatus.OCCUPIED;
+    await this.tableRepo.save(table);
+    this.gateway.emitClub(club.id, 'booking-confirmed', order);
+    this.gateway.emitClub(club.id, 'table-updated', table);
+    return order;
   }
 
   async bookTable(userId: string, tableId: string, startAt: Date, durationMinutes: number, note?: string) {
@@ -167,7 +216,7 @@ export class BilliardService {
   }
 
   async findMyOrders(userId: string) {
-    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club'] });
+    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club', 'items', 'items.extra'] });
   }
 
   // Admin: list pending orders for a club
@@ -204,6 +253,9 @@ export class BilliardService {
     }
     const extra = await this.extraRepo.findOne({ where: { id: extraId } });
     if (!extra) throw new NotFoundException('Extra not found');
+    if (status === BilliardOrderItemStatus.ACCEPTED && Number(extra.stockQuantity || 0) < quantity) {
+      throw new BadRequestException(`${extra.name} omborda yetarli emas`);
+    }
 
     const item = this.itemRepo.create({
       orderId: order.id,
@@ -217,9 +269,12 @@ export class BilliardService {
     await this.itemRepo.save(item);
 
     if (status === BilliardOrderItemStatus.ACCEPTED) {
+      extra.stockQuantity = Number(extra.stockQuantity || 0) - quantity;
+      await this.extraRepo.save(extra);
       order.total = Number((Number(order.total) + Number(extra.price) * quantity).toFixed(2));
       await this.orderRepo.save(order);
       this.gateway.emitClub(order.clubId, 'bill-updated', order);
+      this.gateway.emitClub(order.clubId, 'inventory-updated', extra);
     } else {
       this.gateway.emitClub(order.clubId, 'extra-requested', { item, order });
     }
@@ -238,12 +293,18 @@ export class BilliardService {
     item.status = BilliardOrderItemStatus.ACCEPTED;
     item.price = Number(item.extra?.price || item.price || 0);
     item.name = item.name || item.extra?.name || 'Qo‘shimcha buyurtma';
+    if (Number(item.extra?.stockQuantity || 0) < item.quantity) {
+      throw new BadRequestException(`${item.extra?.name || item.name} omborda yetarli emas`);
+    }
+    item.extra.stockQuantity = Number(item.extra.stockQuantity || 0) - item.quantity;
+    await this.extraRepo.save(item.extra);
     await this.itemRepo.save(item);
 
     const order = item.order;
     order.total = Number((Number(order.total) + Number(item.price) * item.quantity).toFixed(2));
     await this.orderRepo.save(order);
     this.gateway.emitClub(order.clubId, 'extra-accepted', { item, order });
+    this.gateway.emitClub(order.clubId, 'inventory-updated', item.extra);
     return item;
   }
 
@@ -252,7 +313,7 @@ export class BilliardService {
     if (userId) where.userId = userId;
     const order = await this.orderRepo.findOne({ where, relations: ['table', 'club'] });
     if (!order) throw new NotFoundException('Faol sessiya topilmadi');
-    const items = await this.itemRepo.find({ where: { orderId: order.id }, relations: ['extra'] });
+    const items = await this.itemRepo.find({ where: { orderId: order.id, status: BilliardOrderItemStatus.ACCEPTED }, relations: ['extra'] });
     return { order, items };
   }
 
@@ -289,5 +350,44 @@ export class BilliardService {
     this.gateway.emitClub(order.clubId, 'table-updated', table);
 
     return { order, items, finalTotal };
+  }
+
+  async getAnalytics(tenantId: string) {
+    const club = await this.findAdminClub(tenantId);
+    const archiveFrom = new Date();
+    archiveFrom.setFullYear(archiveFrom.getFullYear() - 5);
+
+    const orders = await this.orderRepo.find({
+      where: { clubId: club.id, status: BilliardOrderStatus.COMPLETED, closedAt: MoreThanOrEqual(archiveFrom) },
+      relations: ['table'],
+      order: { closedAt: 'DESC' },
+    });
+
+    const byTable = new Map<string, any>();
+    for (const order of orders) {
+      const key = order.tableId;
+      const current = byTable.get(key) || {
+        tableId: key,
+        tableName: order.table?.name || 'Stol',
+        sessions: 0,
+        minutes: 0,
+        revenue: 0,
+      };
+      current.sessions += 1;
+      current.minutes += Number(order.durationMinutes || 0);
+      current.revenue += Number(order.total || 0);
+      byTable.set(key, current);
+    }
+
+    return {
+      archiveYears: 5,
+      totals: {
+        sessions: orders.length,
+        minutes: orders.reduce((s, o) => s + Number(o.durationMinutes || 0), 0),
+        revenue: orders.reduce((s, o) => s + Number(o.total || 0), 0),
+      },
+      byTable: Array.from(byTable.values()).sort((a, b) => b.revenue - a.revenue),
+      archive: orders,
+    };
   }
 }

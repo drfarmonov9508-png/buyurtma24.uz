@@ -34,7 +34,11 @@ export default function TablesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 6000);
+    return () => clearInterval(timer);
+  }, [id]);
 
   const activeOrdersByTable = useMemo(() => {
     const map = new Map<string, any>();
@@ -104,8 +108,18 @@ export default function TablesPage({ params }: { params: { id: string } }) {
               )}
 
               {ownConfirmed && (
-                <div className="mt-4 rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700">
-                  <Clock className="mr-1 inline h-4 w-4" /> Sessiya faol
+                <div className="mt-4 space-y-2 rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700">
+                  <p><Clock className="mr-1 inline h-4 w-4" /> Sessiya faol</p>
+                  {order.items?.length > 0 && (
+                    <div className="space-y-1">
+                      {order.items.map((item: any) => (
+                        <div key={item.id} className="flex justify-between rounded-xl bg-white/70 px-2 py-1 text-xs">
+                          <span>{item.extra?.name || item.name} x {item.quantity}</span>
+                          <b>{item.status === 'accepted' ? 'Qabul qilindi' : 'Kutilmoqda'}</b>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -13,6 +13,9 @@ export class ExtendBilliardManagement1780000000000 implements MigrationInterface
     await queryRunner.query(`ALTER TABLE "billiard_table_types" ADD COLUMN IF NOT EXISTS "details" character varying`);
     await queryRunner.query(`ALTER TABLE "billiard_extras" ADD COLUMN IF NOT EXISTS "clubId" uuid`);
     await queryRunner.query(`ALTER TABLE "billiard_extras" ADD COLUMN IF NOT EXISTS "category" character varying`);
+    await queryRunner.query(`ALTER TABLE "billiard_extras" ADD COLUMN IF NOT EXISTS "image" character varying`);
+    await queryRunner.query(`ALTER TABLE "billiard_extras" ADD COLUMN IF NOT EXISTS "stockQuantity" integer NOT NULL DEFAULT 0`);
+    await queryRunner.query(`ALTER TABLE "billiard_extras" ADD COLUMN IF NOT EXISTS "alertThreshold" integer NOT NULL DEFAULT 0`);
     await queryRunner.query(`ALTER TABLE "billiard_orders" ADD COLUMN IF NOT EXISTS "confirmedAt" TIMESTAMP WITH TIME ZONE`);
     await queryRunner.query(`ALTER TABLE "billiard_orders" ADD COLUMN IF NOT EXISTS "closedAt" TIMESTAMP WITH TIME ZONE`);
     await queryRunner.query(`ALTER TABLE "billiard_orders" ALTER COLUMN "endAt" DROP NOT NULL`);
@@ -33,6 +36,9 @@ export class ExtendBilliardManagement1780000000000 implements MigrationInterface
     await queryRunner.query(`ALTER TABLE "billiard_orders" DROP COLUMN IF EXISTS "closedAt"`);
     await queryRunner.query(`ALTER TABLE "billiard_orders" DROP COLUMN IF EXISTS "confirmedAt"`);
     await queryRunner.query(`ALTER TABLE "billiard_extras" DROP COLUMN IF EXISTS "category"`);
+    await queryRunner.query(`ALTER TABLE "billiard_extras" DROP COLUMN IF EXISTS "alertThreshold"`);
+    await queryRunner.query(`ALTER TABLE "billiard_extras" DROP COLUMN IF EXISTS "stockQuantity"`);
+    await queryRunner.query(`ALTER TABLE "billiard_extras" DROP COLUMN IF EXISTS "image"`);
     await queryRunner.query(`ALTER TABLE "billiard_extras" DROP COLUMN IF EXISTS "clubId"`);
     await queryRunner.query(`ALTER TABLE "billiard_table_types" DROP COLUMN IF EXISTS "details"`);
     await queryRunner.query(`ALTER TABLE "billiard_table_types" DROP COLUMN IF EXISTS "tier"`);

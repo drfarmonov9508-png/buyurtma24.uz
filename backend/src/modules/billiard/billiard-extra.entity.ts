@@ -12,8 +12,17 @@ export class BilliardExtra extends BaseEntity {
   @Column({ nullable: true })
   category: string;
 
+  @Column({ nullable: true })
+  image: string;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   price: number;
+
+  @Column({ type: 'int', default: 0 })
+  stockQuantity: number;
+
+  @Column({ type: 'int', default: 0 })
+  alertThreshold: number;
 
   @Column({ default: true })
   isActive: boolean;

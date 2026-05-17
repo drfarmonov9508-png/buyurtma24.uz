@@ -1,8 +1,9 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { User } from '../users/user.entity';
 import { BilliardClub } from './billiard-club.entity';
 import { BilliardTable } from './billiard-table.entity';
+import { BilliardOrderItem } from './billiard-order-item.entity';
 
 export enum BilliardOrderStatus {
   PENDING = 'pending',
@@ -30,6 +31,9 @@ export class BilliardOrder extends BaseEntity {
 
   @ManyToOne(() => BilliardTable, { nullable: false })
   table: BilliardTable;
+
+  @OneToMany(() => BilliardOrderItem, (item) => item.order)
+  items: BilliardOrderItem[];
 
   @Column({ type: 'enum', enum: BilliardOrderStatus, default: BilliardOrderStatus.PENDING })
   status: BilliardOrderStatus;

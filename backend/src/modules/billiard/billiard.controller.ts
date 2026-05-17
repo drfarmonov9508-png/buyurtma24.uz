@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Post, Body, UseGuards, Patch } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -105,6 +105,30 @@ export class BilliardController {
   @Post('admin/extras')
   createExtra(@CurrentUser('tenantId') tenantId: string, @Body() body: any) {
     return this.service.createExtra(tenantId, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Patch('admin/extras/:id')
+  updateExtra(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateExtraStock(tenantId, id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Post('admin/tables/:id/open')
+  openTable(@CurrentUser('tenantId') tenantId: string, @CurrentUser('id') adminId: string, @Param('id') id: string) {
+    return this.service.openTableByAdmin(tenantId, adminId, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Get('admin/analytics')
+  analytics(@CurrentUser('tenantId') tenantId: string) {
+    return this.service.getAnalytics(tenantId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

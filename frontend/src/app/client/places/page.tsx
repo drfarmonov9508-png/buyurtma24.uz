@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { publicApi, ratingsApi, tablesApi, menuApi, ordersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { formatCurrency } from '@/lib/utils';
@@ -29,7 +30,17 @@ type Tab  = 'menu' | 'orders';
 interface CartItem { id: string; name: string; price: number; qty: number; image?: string; }
 
 export default function ClientPlacesPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-gray-400">Yuklanmoqda...</div>}>
+      <ClientPlacesContent />
+    </Suspense>
+  );
+}
+
+function ClientPlacesContent() {
   const { user } = useAuthStore();
+  const searchParams = useSearchParams();
+  const placeType = searchParams.get('type') || 'food';
 
   /* ─── Step state ─── */
   const [step, setStep]     = useState<Step>('list');
@@ -65,9 +76,15 @@ export default function ClientPlacesPage() {
   useEffect(() => {
     publicApi.getTenants().then(async (res) => {
       const list = (() => { const r = res?.data?.data ?? res?.data; return Array.isArray(r) ? r : []; })();
-      setTenants(list);
+      const foodTypes = ['cafe', 'restaurant', 'oshxona', 'fastfood'];
+      const marketTypes = ['market', 'supermarket', 'dokon'];
+      const scoped = list.filter((t: any) => {
+        if (placeType === 'market') return marketTypes.includes(t.businessType);
+        return foodTypes.includes(t.businessType);
+      });
+      setTenants(scoped);
       const map: Record<string, any> = {};
-      await Promise.allSettled(list.map(async (t: any) => {
+      await Promise.allSettled(scoped.map(async (t: any) => {
         try {
           const r = await ratingsApi.getTenantRating(t.id);
           const d = r?.data?.data ?? r?.data;
@@ -88,7 +105,7 @@ export default function ClientPlacesPage() {
         );
         if (active.length > 0) {
           const firstOrder = active[0];
-          const matchedTenant = list.find((t: any) => t.id === firstOrder.tenantId);
+          const matchedTenant = scoped.find((t: any) => t.id === firstOrder.tenantId);
           const tbl = firstOrder.table;
           if (matchedTenant && tbl) {
             await startSession(matchedTenant, tbl, active);
@@ -96,7 +113,7 @@ export default function ClientPlacesPage() {
         }
       } catch {}
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [placeType]);
 
   /* ── Poll order statuses ── */
   const pollOrders = useCallback(async (orders: any[]) => {
@@ -216,8 +233,12 @@ export default function ClientPlacesPage() {
   if (step === 'list') return (
     <div className="max-w-4xl space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🏪 Tashkilotlar</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Kafe, restoran, market va boshqalar</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          {placeType === 'market' ? 'Supermarketlar' : 'Restoran & Kafelar'}
+        </h1>
+        <p className="text-gray-500 text-sm mt-0.5">
+          {placeType === 'market' ? 'Market va supermarketlar' : 'Faqat restoran, kafe, oshxona va fast food joylari'}
+        </p>
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
