@@ -37,7 +37,7 @@ export class BilliardOrder extends BaseEntity {
   @Column({ type: 'timestamptz' })
   startAt: Date;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz', nullable: true })
   endAt: Date;
 
   @Column({ default: 60 })
@@ -51,4 +51,10 @@ export class BilliardOrder extends BaseEntity {
 
   @Column({ nullable: true })
   note: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  confirmedAt: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  closedAt: Date;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import Sidebar from './Sidebar';
@@ -15,6 +15,7 @@ interface PanelLayoutProps {
 export default function PanelLayout({ children, title, allowedRoles }: PanelLayoutProps) {
   const router = useRouter();
   const { user, isAuthenticated, fetchMe } = useAuthStore();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -39,10 +40,11 @@ export default function PanelLayout({ children, title, allowedRoles }: PanelLayo
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
-      <Sidebar />
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)} />}
+      <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar title={title} />
-        <main className="flex-1 overflow-y-auto p-6 animate-fade-in">
+        <TopBar title={title} onMenuClick={() => setMobileOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 animate-fade-in">
           {children}
         </main>
       </div>

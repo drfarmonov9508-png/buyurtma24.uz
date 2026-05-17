@@ -5,6 +5,8 @@ const PUBLIC_PATHS = ['/login', '/superadmin/login', '/menu'];
 const ROLE_ROUTES: Record<string, string[]> = {
   superadmin: ['/superadmin'],
   cafe_admin: ['/admin'],
+  billiard_admin: ['/billiard-admin'],
+  sport_admin: ['/billiard-admin'],
   manager: ['/manager'],
   cashier: ['/cashier'],
   waiter: ['/waiter'],

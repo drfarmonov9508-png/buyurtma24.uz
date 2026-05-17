@@ -1,4 +1,4 @@
-import { Entity, Column, OneToMany, Index } from 'typeorm';
+import { Entity, Column, OneToMany, Index, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 
 export enum TenantStatus {
@@ -17,6 +17,7 @@ export enum BusinessType {
   SUPERMARKET = 'supermarket',
   DOKON = 'dokon',
   BOSHQA = 'boshqa',
+  SPORT = 'sport',
 }
 
 @Entity('tenants')
@@ -45,7 +46,17 @@ export class Tenant extends BaseEntity {
   address: string;
 
   @Column({ nullable: true })
+  landmark: string;
+
+  @Column({ nullable: true })
   city: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  regionId: string;
+
+  // region relation optional
+  @ManyToOne(() => require('../regions/region.entity').Region, { nullable: true })
+  region: any;
 
   @Column({
     type: 'enum',

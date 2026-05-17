@@ -3,10 +3,17 @@ import { BaseEntity } from '../../common/entities/base.entity';
 import { Region } from '../regions/region.entity';
 import { Service } from '../services/service.entity';
 import { BilliardTable } from './billiard-table.entity';
+import { Tenant } from '../tenants/tenant.entity';
 
 @Entity('billiard_clubs')
 @Index(['slug'], { unique: true })
 export class BilliardClub extends BaseEntity {
+  @Column({ type: 'uuid', nullable: true })
+  tenantId: string;
+
+  @ManyToOne(() => Tenant, { nullable: true, onDelete: 'CASCADE' })
+  tenant: Tenant;
+
   @Column({ length: 120 })
   name: string;
 
@@ -15,6 +22,12 @@ export class BilliardClub extends BaseEntity {
 
   @Column({ nullable: true })
   address: string;
+
+  @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  landmark: string;
 
   @Column({ nullable: true })
   phone: string;

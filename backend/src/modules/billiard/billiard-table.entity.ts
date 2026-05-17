@@ -1,6 +1,7 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { BilliardClub } from './billiard-club.entity';
+import { BilliardTableType } from './billiard-table-type.entity';
 
 export enum BilliardTableStatus {
   FREE = 'free',
@@ -27,6 +28,12 @@ export class BilliardTable extends BaseEntity {
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   pricePerHour: number;
+
+  @Column({ type: 'uuid', nullable: true })
+  typeId: string;
+
+  @ManyToOne(() => BilliardTableType, (t) => t.tables, { nullable: true })
+  type: BilliardTableType;
 
   @Column({ default: true })
   isActive: boolean;

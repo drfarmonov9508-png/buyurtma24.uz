@@ -2,21 +2,27 @@
 
 import { useAuthStore } from '@/store/auth.store';
 import { getInitials } from '@/lib/utils';
-import { Bell, Moon, Sun } from 'lucide-react';
+import { Bell, Menu, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import LanguageSelector from '@/components/ui/LanguageSelector';
 
 interface TopBarProps {
   title?: string;
+  onMenuClick?: () => void;
 }
 
-export default function TopBar({ title }: TopBarProps) {
+export default function TopBar({ title, onMenuClick }: TopBarProps) {
   const { user } = useAuthStore();
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between px-6">
-      {title && <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h1>}
+    <header className="h-16 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-100 dark:border-gray-800 flex items-center justify-between px-4 sm:px-6">
+      <div className="flex items-center gap-3">
+        <button onClick={onMenuClick} className="hidden max-lg:inline-flex p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+          <Menu size={20} />
+        </button>
+        {title && <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{title}</h1>}
+      </div>
       <div className="flex items-center gap-3 ml-auto">
         <button
           className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"

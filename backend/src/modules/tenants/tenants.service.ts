@@ -6,6 +6,7 @@ import { User } from '../users/user.entity';
 import { UserRole } from '../../common/enums/role.enum';
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import * as bcrypt from 'bcryptjs';
+import { BilliardClub } from '../billiard/billiard-club.entity';
 
 export class CreateTenantDto {
   @IsString()
@@ -20,13 +21,21 @@ export class CreateTenantDto {
   @IsNotEmpty()
   businessType: BusinessType;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   address?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  city?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  regionId?: string;
 
   @IsOptional()
   @IsString()
-  city?: string;
+  landmark?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -67,6 +76,7 @@ export class TenantsService {
   constructor(
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>,
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(BilliardClub) private billiardClubRepo: Repository<BilliardClub>,
   ) {}
 
   async create(dto: CreateTenantDto) {
@@ -83,7 +93,9 @@ export class TenantsService {
         businessType: dto.businessType,
         phone: dto.adminPhone,
         address: dto.address,
+        landmark: dto.landmark,
         city: dto.city,
+        regionId: dto.regionId || null,
         status: TenantStatus.TRIAL,
         trialEndsAt,
       }),
@@ -91,6 +103,7 @@ export class TenantsService {
 
     const hashedPassword = await bcrypt.hash(dto.adminPassword, 10);
 
+    const adminRole = dto.businessType === BusinessType.SPORT ? UserRole.BILLIARD_ADMIN : UserRole.CAFE_ADMIN;
     await this.userRepo.save(
       this.userRepo.create({
         tenantId: tenant.id,
@@ -98,10 +111,26 @@ export class TenantsService {
         lastName: dto.adminLastName,
         phone: dto.adminPhone,
         password: hashedPassword,
-        role: UserRole.CAFE_ADMIN,
+        role: adminRole,
         isActive: true,
       }),
     );
+
+    if (dto.businessType === BusinessType.SPORT) {
+      await this.billiardClubRepo.save(
+        this.billiardClubRepo.create({
+          tenantId: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          phone: dto.adminPhone,
+          address: dto.address,
+          city: dto.city,
+          landmark: dto.landmark,
+          regionId: dto.regionId,
+          isActive: true,
+        }),
+      );
+    }
 
     return {
       tenant,
@@ -112,12 +141,17 @@ export class TenantsService {
     };
   }
 
-  async findPublic() {
-    return this.tenantRepo.find({
-      where: [{ status: TenantStatus.ACTIVE }, { status: TenantStatus.TRIAL }],
-      select: ['id', 'name', 'slug', 'address', 'city'],
-      order: { name: 'ASC' },
-    });
+  async findPublic(regionId?: string, businessType?: string) {
+    const query = this.tenantRepo.createQueryBuilder('tenant')
+      .where('tenant.status IN (:...statuses)', { statuses: [TenantStatus.ACTIVE, TenantStatus.TRIAL] });
+
+    if (regionId) query.andWhere('tenant.regionId = :regionId', { regionId });
+    if (businessType) query.andWhere('tenant.businessType = :businessType', { businessType });
+
+    return query
+      .select(['tenant.id', 'tenant.name', 'tenant.slug', 'tenant.address', 'tenant.landmark', 'tenant.city', 'tenant.regionId', 'tenant.businessType'])
+      .orderBy('tenant.name', 'ASC')
+      .getMany();
   }
 
   async findAll(page = 1, limit = 20, search?: string, status?: TenantStatus) {

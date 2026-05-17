@@ -5,9 +5,10 @@ import { TenantsService } from './tenants.service';
 import { Tenant } from './tenant.entity';
 import { User } from '../users/user.entity';
 import { AuditLog } from '../audit/audit-log.entity';
+import { BilliardClub } from '../billiard/billiard-club.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant, User, AuditLog])],
+  imports: [TypeOrmModule.forFeature([Tenant, User, AuditLog, BilliardClub])],
   controllers: [TenantsController],
   providers: [TenantsService],
   exports: [TenantsService],

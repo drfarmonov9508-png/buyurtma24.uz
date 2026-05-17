@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenantsApi } from '@/lib/api';
+import { regionsApi, tenantsApi } from '@/lib/api';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Plus, Search, MoreVertical, CheckCircle, XCircle, Eye, EyeOff, Building2, Trash2 } from 'lucide-react';
@@ -14,6 +14,7 @@ const BUSINESS_TYPES = [
   { value: 'fastfood', label: 'Fast Food' },
   { value: 'market', label: 'Market' },
   { value: 'supermarket', label: 'Supermarket' },
+  { value: 'sport', label: 'Sport' },
   { value: 'dokon', label: "Do'kon" },
   { value: 'boshqa', label: 'Boshqa' },
 ];
@@ -23,12 +24,17 @@ export default function TenantsPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ name: string; login: string; password: string } | null>(null);
-  const [form, setForm] = useState({ name: '', slug: '', businessType: 'cafe', adminFirstName: '', adminLastName: '', adminPhone: '', adminPassword: '' });
+  const [form, setForm] = useState({ name: '', slug: '', businessType: 'cafe', regionId: '', city: '', address: '', landmark: '', adminFirstName: '', adminLastName: '', adminPhone: '', adminPassword: '' });
   const [showAdminPw, setShowAdminPw] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['tenants'],
     queryFn: () => tenantsApi.getAll({ limit: 100 }).then((r) => r.data),
+  });
+
+  const { data: regionsData } = useQuery({
+    queryKey: ['regions-tree'],
+    queryFn: () => regionsApi.getTree().then((r) => r.data.data ?? r.data),
   });
 
   const createMutation = useMutation({
@@ -43,7 +49,7 @@ export default function TenantsPage() {
       toast.success('Tashkilot yaratildi');
       qc.invalidateQueries({ queryKey: ['tenants'] });
       setShowModal(false);
-      setForm({ name: '', slug: '', businessType: 'cafe', adminFirstName: '', adminLastName: '', adminPhone: '', adminPassword: '' });
+      setForm({ name: '', slug: '', businessType: 'cafe', regionId: '', city: '', address: '', landmark: '', adminFirstName: '', adminLastName: '', adminPhone: '', adminPassword: '' });
     },
     onError: (e: any) => toast.error(e?.response?.data?.message || 'Xato'),
   });
@@ -66,6 +72,8 @@ export default function TenantsPage() {
   };
 
   const allTenants: any[] = (() => { const r = data?.data?.data ?? data?.data ?? data; return Array.isArray(r) ? r : []; })();
+  const regions: any[] = Array.isArray(regionsData) ? regionsData : [];
+  const selectedRegion = regions.find((r) => r.id === form.regionId);
   const filtered = allTenants.filter((t: any) =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.slug.includes(search.toLowerCase())
   );
@@ -110,6 +118,7 @@ export default function TenantsPage() {
                 <th className="table-header">Tashkilot</th>
                 <th className="table-header">Turi</th>
                 <th className="table-header">Slug</th>
+                <th className="table-header">Hudud</th>
                 <th className="table-header">Holat</th>
                 <th className="table-header">Ro'yxat sanasi</th>
                 <th className="table-header">Amallar</th>
@@ -117,9 +126,9 @@ export default function TenantsPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-12 text-gray-400">Yuklanmoqda...</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">Yuklanmoqda...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-gray-400">Natija topilmadi</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">Natija topilmadi</td></tr>
               ) : filtered.map((t: any) => (
                 <tr key={t.id} className="table-row">
                   <td className="table-cell">
@@ -135,6 +144,7 @@ export default function TenantsPage() {
                     </span>
                   </td>
                   <td className="table-cell text-gray-500 font-mono text-sm">{t.slug}</td>
+                  <td className="table-cell text-gray-500 text-sm">{[t.city, t.landmark || t.address].filter(Boolean).join(' · ') || '-'}</td>
                   <td className="table-cell">
                     <span className={`badge ${t.status === 'active' ? 'badge-success' : t.status === 'suspended' || t.status === 'blocked' ? 'badge-danger' : 'badge-warning'}`}>
                       {String(t.status || '').toUpperCase()}
@@ -166,7 +176,7 @@ export default function TenantsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-lg animate-slide-in">
+          <div className="card max-h-[92vh] w-full max-w-lg overflow-y-auto p-6 animate-slide-in">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Yangi tashkilot</h2>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -175,7 +185,7 @@ export default function TenantsPage() {
               </div>
               <div>
                 <label className="label">Tashkilot turi</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {BUSINESS_TYPES.map((bt) => (
                     <button
                       key={bt.value}
@@ -191,6 +201,28 @@ export default function TenantsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <hr className="border-gray-100 dark:border-gray-800" />
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Hudud ma'lumotlari</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Viloyat</label>
+                  <select className="input" value={form.regionId} onChange={(e) => setForm({ ...form, regionId: e.target.value, city: '' })}>
+                    <option value="">Viloyat tanlang</option>
+                    {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Shahar/Tuman</label>
+                  <select className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} disabled={!selectedRegion}>
+                    <option value="">Shahar yoki tuman tanlang</option>
+                    {(selectedRegion?.children || []).map((r: any) => <option key={r.id} value={r.name}>{r.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div><label className="label">Mo'ljal</label><input className="input" placeholder="Markaziy stadion yonida" value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} /></div>
+                <div><label className="label">Manzil</label><input className="input" placeholder="Ko'cha va bino" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
               </div>
               <hr className="border-gray-100 dark:border-gray-800" />
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Admin ma'lumotlari</p>
@@ -213,7 +245,10 @@ export default function TenantsPage() {
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Bekor qilish</button>
-              <button onClick={() => createMutation.mutate(form)} disabled={createMutation.isPending} className="btn-primary flex-1">
+              <button onClick={() => {
+                if (!form.regionId || !form.city || !form.landmark || !form.address) return toast.error('Viloyat, shahar/tuman, mo‘ljal va manzil majburiy');
+                createMutation.mutate(form);
+              }} disabled={createMutation.isPending} className="btn-primary flex-1">
                 {createMutation.isPending ? 'Yaratilmoqda...' : 'Yaratish'}
               </button>
             </div>

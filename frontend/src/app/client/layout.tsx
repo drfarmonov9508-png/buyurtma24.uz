@@ -7,14 +7,15 @@ import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import {
-  LayoutDashboard, History, Star, Store, LogOut,
-  ChevronLeft, ChevronRight, UtensilsCrossed, Menu
+  History, Star, Store, LogOut,
+  ChevronLeft, ChevronRight, Menu, ShoppingBasket, Dumbbell
 } from 'lucide-react';
 
 const CLIENT_NAV = [
-  { href: '/client', key: 'dashboard', label: 'Bosh sahifa', icon: LayoutDashboard },
+  { href: '/client/places?type=food', key: 'food', label: 'Restoran & Kafelar', icon: Store },
+  { href: '/client/places?type=market', key: 'market', label: 'Supermarketlar', icon: ShoppingBasket },
+  { href: '/client/sport', key: 'sport', label: "Sport o'yinlari", icon: Dumbbell },
   { href: '/client/history', key: 'history', label: 'Buyurtma tarixi', icon: History },
-  { href: '/client/places', key: 'places', label: 'Tashkilotlar', icon: Store },
   { href: '/client/ratings', key: 'ratings', label: 'Baholarim', icon: Star },
 ];
 
@@ -48,10 +49,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 dark:border-gray-800">
           {!collapsed && (
             <Link href="/client" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
-                <UtensilsCrossed className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 bg-slate-950 dark:bg-white rounded-xl flex items-center justify-center shadow-sm">
+                <span className="text-[11px] font-black text-white dark:text-slate-950">B24</span>
               </div>
-              <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600">Buyurtma24</span>
+              <span className="font-extrabold text-gray-950 dark:text-white">Buyurtma24</span>
             </Link>
           )}
           <button
@@ -64,7 +65,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
         <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
           {CLIENT_NAV.map(({ href, key, label, icon: Icon }) => {
-            const isActive = pathname === href || (href !== '/client' && pathname.startsWith(href));
+            const baseHref = href.split('?')[0];
+            const isActive = pathname === baseHref || (baseHref !== '/client' && pathname.startsWith(baseHref));
             return (
               <Link
                 key={href}

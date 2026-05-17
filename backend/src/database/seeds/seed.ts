@@ -105,6 +105,26 @@ async function seed() {
     ON CONFLICT DO NOTHING;
   `);
 
+  // Billiard table types
+  await AppDataSource.query(`
+    INSERT INTO billiard_table_types (id, name, "pricePerHour", "createdAt", "updatedAt")
+    VALUES
+      (gen_random_uuid(), 'Ordinary', 20000, NOW(), NOW()),
+      (gen_random_uuid(), 'Pro', 35000, NOW(), NOW()),
+      (gen_random_uuid(), 'Premium', 50000, NOW(), NOW())
+    ON CONFLICT DO NOTHING;
+  `);
+
+  // Billiard extras
+  await AppDataSource.query(`
+    INSERT INTO billiard_extras (id, name, price, "isActive", "createdAt", "updatedAt")
+    VALUES
+      (gen_random_uuid(), 'Coca-Cola', 12000, true, NOW(), NOW()),
+      (gen_random_uuid(), 'Beer', 18000, true, NOW(), NOW()),
+      (gen_random_uuid(), 'Chips', 8000, true, NOW(), NOW())
+    ON CONFLICT DO NOTHING;
+  `);
+
   console.log('✅ Seed complete!');
   console.log('   SuperAdmin: admin@buyurtma24.uz / Admin123!');
   console.log('   Cafe Admin: +998901234567 / Admin123!');

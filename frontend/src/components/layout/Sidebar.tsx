@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Store, Users, BarChart2,
   Settings, LogOut, ChevronLeft, ChevronRight, Tag, Package,
-  UtensilsCrossed, Table2, ClipboardList, Star, Percent
+  Table2, ClipboardList, Star, Percent, X
 } from 'lucide-react';
 
 type NavKey = 'dashboard' | 'categories' | 'products' | 'tables' | 'orders' | 'staff' | 'inventory' | 'discounts' | 'reports' | 'settings' | 'cafes' | 'subscriptions' | 'users';
@@ -25,7 +25,7 @@ const SUPERADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
 const ADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
   { href: '/admin', key: 'dashboard', icon: LayoutDashboard },
   { href: '/admin/categories', key: 'categories', icon: Tag },
-  { href: '/admin/products', key: 'products', icon: UtensilsCrossed },
+  { href: '/admin/products', key: 'products', icon: Package },
   { href: '/admin/tables', key: 'tables', icon: Table2 },
   { href: '/admin/orders', key: 'orders', icon: ClipboardList },
   { href: '/admin/staff', key: 'staff', icon: Users },
@@ -33,6 +33,10 @@ const ADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
   { href: '/admin/discounts', key: 'discounts', icon: Percent },
   { href: '/admin/reports', key: 'reports', icon: BarChart2 },
   { href: '/admin/settings', key: 'settings', icon: Settings },
+];
+
+const BILLIARD_NAV: { href: string; key: NavKey; icon: any }[] = [
+  { href: '/billiard-admin', key: 'dashboard', icon: LayoutDashboard },
 ];
 
 const CASHIER_NAV: { href: string; key: NavKey; icon: any }[] = [
@@ -55,9 +59,11 @@ const NAV_MAP: Record<string, typeof ADMIN_NAV> = {
   cashier: CASHIER_NAV,
   waiter: WAITER_NAV,
   kitchen: KITCHEN_NAV,
+  billiard_admin: BILLIARD_NAV,
+  sport_admin: BILLIARD_NAV,
 };
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileOpen?: boolean; onMobileClose?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -74,23 +80,31 @@ export default function Sidebar() {
 
   return (
     <aside className={cn(
-      'h-screen flex flex-col bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300',
-      collapsed ? 'w-16' : 'w-64'
+      'h-screen flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur border-r border-gray-100 dark:border-gray-800 transition-all duration-300 z-50',
+      collapsed ? 'w-16' : 'w-64',
+      'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:w-72 max-lg:shadow-2xl',
+      mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
     )}>
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 dark:border-gray-800">
         {!collapsed && (
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
-              <UtensilsCrossed className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-slate-950 dark:bg-white rounded-xl flex items-center justify-center shadow-sm">
+              <span className="text-[11px] font-black text-white dark:text-slate-950">B24</span>
             </div>
-            <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600">Buyurtma24</span>
+            <span className="font-extrabold text-gray-950 dark:text-white">Buyurtma24</span>
           </Link>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 ml-auto"
+          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 ml-auto max-lg:hidden"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+        <button
+          onClick={onMobileClose}
+          className="hidden max-lg:block p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+        >
+          <X size={18} />
         </button>
       </div>
 
@@ -102,6 +116,7 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onMobileClose}
               className={cn(
                 isActive ? 'sidebar-item-active' : 'sidebar-item-inactive',
                 collapsed && 'justify-center px-2'
