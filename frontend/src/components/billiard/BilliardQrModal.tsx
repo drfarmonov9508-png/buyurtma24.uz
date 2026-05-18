@@ -18,7 +18,7 @@ export default function BilliardQrModal({ table, onClose }: Props) {
   const url = table?.qrToken ? getBilliardScanUrl(table.qrToken) : '';
 
   const handlePrint = useReactToPrint({
-    contentRef: printRef,
+    content: () => printRef.current,
     documentTitle: `QR-${table?.name || 'stol'}`,
   });
 
