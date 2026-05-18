@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 import { useLang } from '@/lib/i18n';
@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Store, Users, BarChart2,
   Settings, LogOut, ChevronLeft, ChevronRight, Tag, Package,
-  Table2, ClipboardList, Star, Percent, X
+  Table2, ClipboardList, Star, Percent, X, PackageOpen
 } from 'lucide-react';
 
 type NavKey = 'dashboard' | 'categories' | 'products' | 'tables' | 'orders' | 'staff' | 'inventory' | 'discounts' | 'reports' | 'settings' | 'cafes' | 'subscriptions' | 'users';
@@ -36,7 +36,10 @@ const ADMIN_NAV: { href: string; key: NavKey; icon: any }[] = [
 ];
 
 const BILLIARD_NAV: { href: string; key: NavKey; icon: any }[] = [
-  { href: '/billiard-admin', key: 'dashboard', icon: LayoutDashboard },
+  { href: '/billiard-admin?tab=dashboard', key: 'dashboard', icon: LayoutDashboard },
+  { href: '/billiard-admin?tab=tables', key: 'tables', icon: Table2 },
+  { href: '/billiard-admin?tab=inventory', key: 'inventory', icon: PackageOpen },
+  { href: '/billiard-admin?tab=analytics', key: 'reports', icon: BarChart2 },
 ];
 
 const CASHIER_NAV: { href: string; key: NavKey; icon: any }[] = [
@@ -65,6 +68,7 @@ const NAV_MAP: Record<string, typeof ADMIN_NAV> = {
 
 export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileOpen?: boolean; onMobileClose?: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const { tr } = useLang();
@@ -111,7 +115,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: { mobileO
       <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
         {navItems.map(({ href, key, icon: Icon }) => {
           const label = tr.nav[key] ?? key;
-          const isActive = pathname === href || (href !== '/admin' && href !== '/superadmin' && pathname.startsWith(href));
+          const [baseHref, query] = href.split('?');
+          const isActive = query && searchParams
+            ? pathname === baseHref && new URLSearchParams(query).toString().split('&').every((entry) => {
+                const [k, v] = entry.split('=');
+                return searchParams.get(k) === v;
+              })
+            : pathname === href || (href !== '/admin' && href !== '/superadmin' && pathname.startsWith(href));
           return (
             <Link
               key={href}

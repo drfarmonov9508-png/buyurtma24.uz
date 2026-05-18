@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { useReactToPrint } from 'react-to-print';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import {
   AlertTriangle, BarChart3, BellRing, Check, Clock, PackageOpen, Plus,
   ReceiptText, Table2, Timer, WalletCards, X
 } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { billiardApi, uploadApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 
@@ -24,7 +27,9 @@ function minutesSince(date?: string) {
 
 export default function BilliardAdminPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'dashboard' | 'tables' | 'inventory' | 'analytics'>('dashboard');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get('tab') as 'dashboard' | 'tables' | 'inventory' | 'analytics' | null;
+  const [tab, setTab] = useState<'dashboard' | 'tables' | 'inventory' | 'analytics'>(tabParam || 'dashboard');
   const [tableForm, setTableForm] = useState({ name: '', typeId: '', pricePerHour: '', capacity: '4' });
   const [typeForm, setTypeForm] = useState({ name: 'Oddiy', tier: 'oddiy', pricePerHour: '', details: '' });
   const [inventoryForm, setInventoryForm] = useState({ name: '', category: 'Ichimlik', price: '', stockQuantity: '', alertThreshold: '', image: '' });
@@ -40,9 +45,14 @@ export default function BilliardAdminPage() {
     refetchInterval: 7000,
   });
 
+  const analyticsQueryParams = useMemo(() => ({
+    period: searchParams?.get('analyticsPeriod') || 'month',
+    user: searchParams?.get('analyticsUser') || undefined,
+  }), [searchParams]);
+
   const { data: analyticsData } = useQuery({
-    queryKey: ['billiard-analytics'],
-    queryFn: () => billiardApi.getAnalytics().then((r) => r.data.data ?? r.data),
+    queryKey: ['billiard-analytics', analyticsQueryParams],
+    queryFn: () => billiardApi.getAnalytics(analyticsQueryParams).then((r) => r.data.data ?? r.data),
     enabled: tab === 'analytics',
   });
 
@@ -53,6 +63,11 @@ export default function BilliardAdminPage() {
   const orders: any[] = data?.orders || [];
   const pendingItems: any[] = data?.pendingItems || [];
   const analytics = analyticsData || {};
+
+  useEffect(() => {
+    if (!tabParam) return;
+    setTab(tabParam);
+  }, [tabParam]);
 
   useEffect(() => {
     if (!club?.id) return;
