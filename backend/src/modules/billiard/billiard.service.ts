@@ -82,7 +82,7 @@ export class BilliardService {
   }
 
   async findMyOrders(userId: string) {
-    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club'] });
+    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club', 'items', 'items.extra'] });
   }
 
   private async getClubByTenant(tenantId: string) {

@@ -42,7 +42,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         'h-screen flex flex-col overflow-hidden border-r border-gray-100 bg-white/95 backdrop-blur-xl transition-all duration-300 ease-out dark:border-gray-800 dark:bg-slate-950/95',
         collapsed ? 'w-20' : 'w-72',
         'lg:relative',
-        'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:h-screen',
+        'max-lg:fixed max-lg:left-0 max-lg:top-0 max-lg:h-screen max-lg:z-50',
         mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
       )}>
         <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800">
