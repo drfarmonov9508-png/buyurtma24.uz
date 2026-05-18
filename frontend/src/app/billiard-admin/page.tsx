@@ -161,7 +161,7 @@ export default function BilliardAdminPage() {
   });
 
   const openTable = useMutation({ mutationFn: (id: string) => billiardApi.openTable(id), onSuccess: () => { toast.success('Stol ochildi'); refresh(); } });
-  const confirm = useMutation({ mutationFn: (id: string) => billiardApi.confirmOrder(id), onSuccess: () => { toast.success('Tasdiqlandi, vaqt boshlandi'); refresh(); } });
+  const confirmOrderMut = useMutation({ mutationFn: (id: string) => billiardApi.confirmOrder(id), onSuccess: () => { toast.success('Tasdiqlandi, vaqt boshlandi'); refresh(); } });
   const reject = useMutation({
     mutationFn: (id: string) => billiardApi.rejectOrder(id),
     onSuccess: () => { toast.success('Rad etildi'); refresh(); },
@@ -267,7 +267,7 @@ export default function BilliardAdminPage() {
               order={ordersByTable.get(table.id)}
               alerts={pendingByTable.get(table.id) || []}
               onOpen={() => openTable.mutate(table.id)}
-              onConfirm={() => confirm.mutate(ordersByTable.get(table.id)?.id)}
+              onConfirm={() => confirmOrderMut.mutate(ordersByTable.get(table.id)?.id)}
               onReject={() => reject.mutate(ordersByTable.get(table.id)?.id)}
               onClose={() => close.mutate(ordersByTable.get(table.id)?.id)}
               onService={() => setServiceTable(table)}
@@ -413,7 +413,7 @@ export default function BilliardAdminPage() {
           table={editingTable}
           types={types}
           onClose={() => setEditingTable(null)}
-          onSave={(data) => updateTableMut.mutate({ id: editingTable.id, data })}
+          onSave={(data: any) => updateTableMut.mutate({ id: editingTable.id, data })}
           saving={updateTableMut.isPending}
         />
       )}
@@ -422,7 +422,7 @@ export default function BilliardAdminPage() {
         <EditExtraModal
           extra={editingExtra}
           onClose={() => setEditingExtra(null)}
-          onSave={(data) => updateExtraMut.mutate({ id: editingExtra.id, data })}
+          onSave={(data: any) => updateExtraMut.mutate({ id: editingExtra.id, data })}
           saving={updateExtraMut.isPending}
         />
       )}
