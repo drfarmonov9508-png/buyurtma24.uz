@@ -66,6 +66,7 @@ export const publicApi = {
 export const regionsApi = {
   getTree: () => api.get('/v1/regions/tree'),
   getAll: (params?: any) => api.get('/v1/regions', { params }),
+  create: (data: any) => api.post('/v1/regions', data),
 };
 
 export const servicesApi = {
@@ -78,6 +79,17 @@ export const billiardApi = {
   getTables: (clubId: string) => api.get(`/v1/billiard/clubs/${clubId}/tables`),
   bookTable: (tableId: string, data: any) => api.post(`/v1/billiard/tables/${tableId}/book`, data),
   getMyOrders: () => api.get('/v1/billiard/orders/my'),
+  adminSnapshot: () => api.get('/v1/billiard/admin/snapshot'),
+  getAnalytics: () => api.get('/v1/billiard/admin/analytics'),
+  createType: (data: any) => api.post('/v1/billiard/types', data),
+  createTable: (data: any) => api.post('/v1/billiard/tables', data),
+  createExtra: (data: any) => api.post('/v1/billiard/extras', data),
+  updateExtra: (id: string, data: any) => api.patch(`/v1/billiard/extras/${id}`, data),
+  openTable: (id: string) => api.post(`/v1/billiard/tables/${id}/open`),
+  confirmOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/confirm`),
+  addOrderItem: (orderId: string, data: any) => api.post(`/v1/billiard/orders/${orderId}/items`, data),
+  acknowledgeItem: (id: string) => api.patch(`/v1/billiard/orders/items/${id}/acknowledge`),
+  closeOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/close`, {}),
 };
 
 export const tenantsApi = {

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Post, Body, UseGuards, Patch } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -53,6 +53,78 @@ export class BilliardController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
   @ApiBearerAuth()
+  @Get('admin/snapshot')
+  adminSnapshot(@CurrentUser('tenantId') tenantId: string) {
+    return this.service.adminSnapshot(tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Get('admin/analytics')
+  getAnalytics(@CurrentUser('tenantId') tenantId: string) {
+    return this.service.getAnalytics(tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Post('types')
+  createType(@CurrentUser('tenantId') tenantId: string, @Body() data: any) {
+    return this.service.createType(tenantId, data);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Post('tables')
+  createTable(@CurrentUser('tenantId') tenantId: string, @Body() data: any) {
+    return this.service.createTable(tenantId, data);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Post('extras')
+  createExtra(@CurrentUser('tenantId') tenantId: string, @Body() data: any) {
+    return this.service.createExtra(tenantId, data);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Patch('extras/:id')
+  updateExtra(@Param('id') id: string, @Body() data: any) {
+    return this.service.updateExtra(id, data);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Post('tables/:id/open')
+  openTable(@Param('id') id: string, @CurrentUser('id') adminId: string) {
+    return this.service.openTable(adminId, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Patch('orders/items/:id/acknowledge')
+  acknowledgeItem(@Param('id') id: string) {
+    return this.service.acknowledgeItem(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Post('orders/:id/close')
+  closeOrder(@Param('id') id: string) {
+    return this.service.closeOrder(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
   @Get('orders/pending')
   findPending(@Query('clubId') clubId: string) {
     return this.service.findPendingOrders(clubId);
@@ -72,13 +144,5 @@ export class BilliardController {
   @Post('orders/:id/items')
   addOrderItem(@Param('id') id: string, @Body('extraId') extraId: string, @Body('quantity') quantity: number) {
     return this.service.addOrderItem(id, extraId, quantity || 1);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.BILLIARD_ADMIN, UserRole.SUPERADMIN)
-  @ApiBearerAuth()
-  @Post('orders/:id/close')
-  closeOrder(@Param('id') id: string) {
-    return this.service.closeOrder(id);
   }
 }

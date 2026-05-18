@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { BilliardClub } from './billiard-club.entity';
 import { BilliardTable, BilliardTableStatus } from './billiard-table.entity';
 import { BilliardOrder, BilliardOrderStatus } from './billiard-order.entity';
 import { BilliardTableType } from './billiard-table-type.entity';
 import { BilliardExtra } from './billiard-extra.entity';
-import { BilliardOrderItem } from './billiard-order-item.entity';
+import { BilliardOrderItem, BilliardOrderItemStatus } from './billiard-order-item.entity';
 
 @Injectable()
 export class BilliardService {
@@ -83,6 +83,119 @@ export class BilliardService {
 
   async findMyOrders(userId: string) {
     return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, relations: ['table', 'club'] });
+  }
+
+  private async getClubByTenant(tenantId: string) {
+    if (!tenantId) throw new BadRequestException('Tenant not found');
+    const club = await this.clubRepo.findOne({ where: { tenantId, isActive: true } });
+    if (!club) throw new NotFoundException('Club not found');
+    return club;
+  }
+
+  async adminSnapshot(tenantId: string) {
+    const club = await this.getClubByTenant(tenantId);
+    const tables = await this.tableRepo.find({ where: { clubId: club.id, isActive: true }, order: { name: 'ASC' }, relations: ['type'] });
+    const types = await this.typeRepo.find({ where: { clubId: club.id }, order: { name: 'ASC' } });
+    const extras = await this.extraRepo.find({ where: { clubId: club.id, isActive: true } });
+    const orders = await this.orderRepo.find({ where: { clubId: club.id, status: In([BilliardOrderStatus.PENDING, BilliardOrderStatus.CONFIRMED]) }, order: { createdAt: 'ASC' }, relations: ['table', 'items', 'items.extra'] });
+    const pendingItems = await this.itemRepo.createQueryBuilder('item')
+      .leftJoinAndSelect('item.order', 'order')
+      .leftJoinAndSelect('item.extra', 'extra')
+      .leftJoinAndSelect('order.table', 'table')
+      .where('item.status = :status', { status: 'pending' })
+      .andWhere('order.clubId = :clubId', { clubId: club.id })
+      .getMany();
+
+    return { club, tables, types, extras, orders, pendingItems };
+  }
+
+  async getAnalytics(tenantId: string) {
+    const club = await this.getClubByTenant(tenantId);
+    const orders = await this.orderRepo.find({ where: { clubId: club.id, status: BilliardOrderStatus.COMPLETED }, relations: ['table'] });
+    const totals = {
+      sessions: orders.length,
+      minutes: orders.reduce((sum, order) => sum + (order.durationMinutes || 0), 0),
+      revenue: orders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+    };
+    const byTableMap = new Map<string, any>();
+    orders.forEach((order) => {
+      const tableId = order.tableId;
+      const entry = byTableMap.get(tableId) || { tableId, tableName: order.table?.name || 'Noma' , sessions: 0, minutes: 0, revenue: 0 };
+      entry.sessions += 1;
+      entry.minutes += order.durationMinutes || 0;
+      entry.revenue += Number(order.total || 0);
+      byTableMap.set(tableId, entry);
+    });
+
+    return { totals, byTable: Array.from(byTableMap.values()) };
+  }
+
+  async createType(tenantId: string, data: any) {
+    const club = await this.getClubByTenant(tenantId);
+    return this.typeRepo.save({ ...data, clubId: club.id });
+  }
+
+  async createTable(tenantId: string, data: any) {
+    const club = await this.getClubByTenant(tenantId);
+    return this.tableRepo.save({ ...data, clubId: club.id });
+  }
+
+  async createExtra(tenantId: string, data: any) {
+    const club = await this.getClubByTenant(tenantId);
+    return this.extraRepo.save({ ...data, clubId: club.id });
+  }
+
+  async updateExtra(id: string, data: any) {
+    const extra = await this.extraRepo.findOne({ where: { id } });
+    if (!extra) throw new NotFoundException('Extra not found');
+    if (data.addQuantity !== undefined) {
+      extra.stockQuantity = Number(extra.stockQuantity || 0) + Number(data.addQuantity || 0);
+    }
+    if (data.name !== undefined) extra.name = data.name;
+    if (data.category !== undefined) extra.category = data.category;
+    if (data.image !== undefined) extra.image = data.image;
+    if (data.price !== undefined) extra.price = Number(data.price);
+    if (data.alertThreshold !== undefined) extra.alertThreshold = Number(data.alertThreshold);
+    if (data.isActive !== undefined) extra.isActive = data.isActive;
+    return this.extraRepo.save(extra);
+  }
+
+  async openTable(adminId: string, tableId: string) {
+    const table = await this.tableRepo.findOne({ where: { id: tableId, isActive: true } });
+    if (!table) throw new NotFoundException('Table not found');
+    if (table.status !== BilliardTableStatus.FREE) {
+      throw new BadRequestException('Table is not available');
+    }
+
+    const club = await this.clubRepo.findOne({ where: { id: table.clubId, isActive: true } });
+    if (!club) throw new NotFoundException('Club not found');
+
+    const start = new Date();
+    const end = new Date(start.getTime() + 60 * 60000);
+    const total = Number(table.pricePerHour || 0);
+
+    const order = this.orderRepo.create({
+      userId: adminId,
+      clubId: club.id,
+      tableId: table.id,
+      status: BilliardOrderStatus.PENDING,
+      startAt: start,
+      endAt: end,
+      durationMinutes: 60,
+      pricePerHour: Number(table.pricePerHour || 0),
+      total,
+    });
+
+    table.status = BilliardTableStatus.RESERVED;
+    await this.tableRepo.save(table);
+    return this.orderRepo.save(order);
+  }
+
+  async acknowledgeItem(itemId: string) {
+    const item = await this.itemRepo.findOne({ where: { id: itemId }, relations: ['order'] });
+    if (!item) throw new NotFoundException('Order item not found');
+    item.status = BilliardOrderItemStatus.ACCEPTED;
+    return this.itemRepo.save(item);
   }
 
   // Admin: list pending orders for a club
