@@ -52,7 +52,7 @@ export function getElapsedMinutes(order: { confirmedAt?: string; startAt?: strin
   return Math.max(1, Math.ceil(getElapsedSeconds(order, now) / 60));
 }
 
-export function estimateSessionCost(order: { pricePerHour?: number; items?: { price: number; quantity: number; status?: string }[] }, now = Date.now()) {
+export function estimateSessionCost(order: { confirmedAt?: string; startAt?: string; createdAt?: string; pricePerHour?: number; items?: { price: number; quantity: number; status?: string }[] }, now = Date.now()) {
   const minutes = getElapsedMinutes(order, now);
   const hourly = Number(order.pricePerHour || 0);
   const tableCost = Number(((minutes / 60) * hourly).toFixed(2));
