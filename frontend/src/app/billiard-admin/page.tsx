@@ -8,7 +8,7 @@ import {
   AlertTriangle, BarChart3, BellRing, Check, Clock, PackageOpen, Plus,
   ReceiptText, Table2, Timer, WalletCards, X
 } from 'lucide-react';
-import { billiardApi } from '@/lib/api';
+import { billiardApi, uploadApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 
 const tiers = [
