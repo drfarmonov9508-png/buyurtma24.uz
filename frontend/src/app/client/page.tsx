@@ -1,15 +1,35 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
-import { clientApi, publicApi } from '@/lib/api';
-import { Store, History, Star, ArrowRight } from 'lucide-react';
+import { billiardApi, clientApi, publicApi } from '@/lib/api';
+import { Store, History, Star, ArrowRight, Clock, Clock3, Users } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ClientDashboard() {
   const { user } = useAuthStore();
   const [tenants, setTenants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { data: historyData } = useQuery({
+    queryKey: ['client-dashboard-history'],
+    queryFn: () => clientApi.getHistory({ limit: 40 }).then((r) => r.data?.data ?? r.data),
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const { data: billiardOrdersData } = useQuery({
+    queryKey: ['client-billiard-sessions'],
+    queryFn: () => billiardApi.getMyOrders().then((r) => r.data?.data ?? r.data),
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const historyEntries: any[] = Array.isArray(historyData) ? historyData : Array.isArray(historyData?.data) ? historyData.data : [];
+  const billiardSessions: any[] = Array.isArray(billiardOrdersData) ? billiardOrdersData : Array.isArray(billiardOrdersData?.data) ? billiardOrdersData.data : [];
+
+  const activeSessions = billiardSessions.filter((order) => !['completed', 'cancelled'].includes(order.status));
+  const lastSession = [...historyEntries]
+    .sort((a, b) => new Date(b.closedAt || b.updatedAt || b.createdAt).getTime() - new Date(a.closedAt || a.updatedAt || a.createdAt).getTime())[0];
 
   useEffect(() => {
     publicApi.getTenants()
@@ -30,6 +50,59 @@ export default function ClientDashboard() {
         </h1>
         <p className="text-gray-500 mt-1">Buyurtma24 platformasiga xush kelibsiz</p>
       </div>
+
+      {(activeSessions.length > 0 || lastSession) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {activeSessions.length > 0 ? (
+            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/30 dark:bg-emerald-950/60">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-white p-3 text-emerald-600 dark:bg-slate-900"><Clock size={24} /></div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Faol sessiyalar</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Sizning hozirgi billiard sessiyalaringiz ro‘yxati.</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                {activeSessions.map((session: any) => (
+                  <div key={session.id} className="rounded-3xl border border-emerald-100 bg-white p-3 text-sm text-slate-700 dark:border-emerald-800 dark:bg-slate-900 dark:text-slate-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{session.table?.name || 'Billiard stol'}</p>
+                        <p className="text-xs text-slate-500">{session.club?.name || session.tenant?.name || 'Joy tanlanmagan'}</p>
+                      </div>
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-100">{session.status === 'confirmed' ? 'Tasdiqlangan' : 'Kutilmoqda'}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                      <span>{session.durationMinutes ? `${session.durationMinutes} min` : 'Davomiylik yo‘q'}</span>
+                      <span>{new Date(session.startAt || session.confirmedAt || session.createdAt).toLocaleString('uz-UZ')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {lastSession ? (
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-slate-900">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-slate-100 p-3 text-slate-600 dark:bg-slate-800 dark:text-slate-200"><Users size={24} /></div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Oxirgi sessiya</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Oxirgi band qilingan stol va davomiylik.</p>
+                </div>
+              </div>
+              <div className="mt-4 rounded-3xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                <p className="text-base font-semibold text-slate-900 dark:text-white">{lastSession.table?.name || 'Billiard stol'}</p>
+                <p className="text-xs text-slate-500 mt-1">{lastSession.club?.name || lastSession.tenant?.name || 'Joy aniqlanmadi'}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="rounded-full bg-white px-2 py-1 dark:bg-slate-800">{lastSession.durationMinutes || '—'} min</span>
+                  <span className="rounded-full bg-white px-2 py-1 dark:bg-slate-800">{new Date(lastSession.closedAt || lastSession.createdAt).toLocaleDateString('uz-UZ')}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

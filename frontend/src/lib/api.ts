@@ -87,6 +87,7 @@ export const billiardApi = {
   updateExtra: (id: string, data: any) => api.patch(`/v1/billiard/extras/${id}`, data),
   openTable: (id: string) => api.post(`/v1/billiard/tables/${id}/open`),
   confirmOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/confirm`),
+  rejectOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/reject`),
   addOrderItem: (orderId: string, data: any) => api.post(`/v1/billiard/orders/${orderId}/items`, data),
   acknowledgeItem: (id: string) => api.patch(`/v1/billiard/orders/items/${id}/acknowledge`),
   closeOrder: (id: string) => api.post(`/v1/billiard/orders/${id}/close`, {}),

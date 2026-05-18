@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { clientApi } from '@/lib/api';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
-import { Check, CircleDot, Clock, History, Loader2, Package, ReceiptText, Store } from 'lucide-react';
+import { Check, CircleDot, Clock, History, Loader2, Package, ReceiptText, Store, ChevronDown } from 'lucide-react';
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: 'Kutilmoqda', color: 'text-amber-700', bg: 'bg-amber-50 dark:bg-amber-900/20' },
@@ -27,6 +27,10 @@ function minutesText(order: any) {
 export default function ClientHistoryPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [groupBy, setGroupBy] = useState<'day' | 'month' | 'year'>('day');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'billiard' | 'food'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { data, isLoading } = useQuery({
     queryKey: ['client-history'],
     queryFn: () => clientApi.getHistory({ limit: 80 }).then((r) => r.data),
@@ -48,9 +52,27 @@ export default function ClientHistoryPage() {
         end.setHours(23, 59, 59, 999);
         if (entryDate > end) return false;
       }
+      if (typeFilter !== 'all' && entry.historyType !== typeFilter) return false;
+      if (statusFilter !== 'all' && entry.status !== statusFilter) return false;
       return true;
     });
   }, [entries, fromDate, toDate]);
+
+  const groupedEntries = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    filteredEntries.forEach((entry: any) => {
+      const date = new Date(entry.closedAt || entry.confirmedAt || entry.createdAt || '');
+      if (!date.getTime()) return;
+      let key = '';
+      if (groupBy === 'month') key = date.toLocaleDateString('uz-UZ', { month: 'long', year: 'numeric' });
+      else if (groupBy === 'year') key = date.getFullYear().toString();
+      else key = date.toLocaleDateString('uz-UZ');
+      groups[key] = [...(groups[key] || []), entry];
+    });
+    return Object.entries(groups).sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+  }, [filteredEntries, groupBy]);
+
+  const toggleGroup = (key: string) => setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -59,7 +81,7 @@ export default function ClientHistoryPage() {
           <History size={24} /> Ilova tarixi
         </h1>
         <p className="mt-1 text-gray-500">Bu raqam orqali restoran, supermarket va billiarddagi barcha harakatlar</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block">
             <span className="label">Boshlanish sanasi</span>
             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="input rounded-2xl" />
@@ -68,7 +90,35 @@ export default function ClientHistoryPage() {
             <span className="label">Tugash sanasi</span>
             <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="input rounded-2xl" />
           </label>
-          <button onClick={() => { setFromDate(''); setToDate(''); }} className="btn-ghost rounded-2xl px-4 py-3">Filtrni tozalash</button>
+          <label className="block">
+            <span className="label">Guruhlash</span>
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as any)} className="input rounded-2xl">
+              <option value="day">Kun</option>
+              <option value="month">Oy</option>
+              <option value="year">Yil</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="label">Tur</span>
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} className="input rounded-2xl">
+              <option value="all">Barchasi</option>
+              <option value="billiard">Billiard</option>
+              <option value="food">Food</option>
+            </select>
+          </label>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block">
+            <span className="label">Status</span>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="input rounded-2xl">
+              <option value="all">Barchasi</option>
+              <option value="pending">Kutilmoqda</option>
+              <option value="confirmed">Qabul qilindi</option>
+              <option value="completed">Yakunlandi</option>
+              <option value="cancelled">Bekor qilingan</option>
+            </select>
+          </label>
+          <button onClick={() => { setFromDate(''); setToDate(''); setTypeFilter('all'); setStatusFilter('all'); }} className="btn-ghost rounded-2xl px-4 py-3">Filtrni tozalash</button>
         </div>
       </div>
 
@@ -83,11 +133,26 @@ export default function ClientHistoryPage() {
           <p className="mt-1 text-sm text-gray-400">Tanlangan sanalar orasida hech qanday tarix yo‘q.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredEntries.map((entry: any) => entry.historyType === 'billiard' ? (
-            <BilliardHistoryCard key={`billiard-${entry.id}`} order={entry} />
-          ) : (
-            <FoodHistoryCard key={`food-${entry.id}`} order={entry} />
+        <div className="space-y-4">
+          {groupedEntries.map(([group, entries]) => (
+            <div key={group} className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-slate-950">
+              <button type="button" onClick={() => toggleGroup(group)} className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-slate-900">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">{group}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{entries.length} ta yozuv</p>
+                </div>
+                <ChevronDown className={`h-5 w-5 transition-transform ${openGroups[group] ? 'rotate-180' : ''}`} />
+              </button>
+              {openGroups[group] !== false && (
+                <div className="space-y-3 border-t border-gray-100 px-4 py-4 dark:border-slate-800">
+                  {entries.map((entry: any) => entry.historyType === 'billiard' ? (
+                    <BilliardHistoryCard key={`billiard-${entry.id}`} order={entry} />
+                  ) : (
+                    <FoodHistoryCard key={`food-${entry.id}`} order={entry} />
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}

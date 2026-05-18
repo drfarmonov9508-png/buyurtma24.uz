@@ -28,6 +28,7 @@ export default function BilliardAdminPage() {
   const [tableForm, setTableForm] = useState({ name: '', typeId: '', pricePerHour: '', capacity: '4' });
   const [typeForm, setTypeForm] = useState({ name: 'Oddiy', tier: 'oddiy', pricePerHour: '', details: '' });
   const [inventoryForm, setInventoryForm] = useState({ name: '', category: 'Ichimlik', price: '', stockQuantity: '', alertThreshold: '', image: '' });
+  const [inventoryUploading, setInventoryUploading] = useState(false);
   const [serviceTable, setServiceTable] = useState<any>(null);
   const [serviceForm, setServiceForm] = useState({ extraId: '', quantity: 1 });
   const [stockAdds, setStockAdds] = useState<Record<string, string>>({});
@@ -106,6 +107,19 @@ export default function BilliardAdminPage() {
     },
   });
 
+  const handleInventoryImageUpload = async (file: File) => {
+    setInventoryUploading(true);
+    try {
+      const { data } = await uploadApi.uploadImage(file);
+      const imageUrl = data?.data?.original ?? data?.data?.url ?? data?.original ?? data?.url;
+      setInventoryForm((prev) => ({ ...prev, image: imageUrl || prev.image }));
+    } catch {
+      toast.error('Rasm yuklashda xato');
+    } finally {
+      setInventoryUploading(false);
+    }
+  };
+
   const addStock = useMutation({
     mutationFn: ({ id, amount }: any) => billiardApi.updateExtra(id, { addQuantity: Number(amount) }),
     onSuccess: () => {
@@ -129,6 +143,15 @@ export default function BilliardAdminPage() {
       toast.success('Mijoz sessiyasi tasdiqlandi');
       qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
     },
+  });
+
+  const reject = useMutation({
+    mutationFn: (id: string) => billiardApi.rejectOrder(id),
+    onSuccess: () => {
+      toast.success('Mijozning band qilish so‘rovi rad etildi');
+      qc.invalidateQueries({ queryKey: ['billiard-admin-snapshot'] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Rad etishda xato yuz berdi'),
   });
 
   const addItem = useMutation({
@@ -221,7 +244,7 @@ export default function BilliardAdminPage() {
 
       {tab === 'dashboard' && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {tables.map((table) => <TableCard key={table.id} table={table} order={ordersByTable.get(table.id)} alerts={pendingByTable.get(table.id) || []} onOpen={() => openTable.mutate(table.id)} onConfirm={confirm.mutate} onClose={close.mutate} onService={() => setServiceTable(table)} onAcknowledge={acknowledge.mutate} />)}
+          {tables.map((table) => <TableCard key={table.id} table={table} order={ordersByTable.get(table.id)} alerts={pendingByTable.get(table.id) || []} onOpen={() => openTable.mutate(table.id)} onConfirm={confirm.mutate} onReject={reject.mutate} onClose={close.mutate} onService={() => setServiceTable(table)} onAcknowledge={acknowledge.mutate} />)}
         </section>
       )}
 
@@ -271,7 +294,16 @@ export default function BilliardAdminPage() {
             <div className="space-y-3">
               <input className="input rounded-2xl" placeholder="Kola 1.5L" value={inventoryForm.name} onChange={(e) => setInventoryForm({ ...inventoryForm, name: e.target.value })} />
               <input className="input rounded-2xl" placeholder="Kategoriya" value={inventoryForm.category} onChange={(e) => setInventoryForm({ ...inventoryForm, category: e.target.value })} />
-              <input className="input rounded-2xl" placeholder="Rasm URL" value={inventoryForm.image} onChange={(e) => setInventoryForm({ ...inventoryForm, image: e.target.value })} />
+              <label className="block">
+                <span className="label">Rasm yuklash</span>
+                <input type="file" accept="image/*" className="input rounded-2xl py-1.5" onChange={(e) => { if (e.target.files?.[0]) handleInventoryImageUpload(e.target.files[0]); }} />
+                {inventoryUploading && <p className="text-xs text-slate-500 mt-2">Rasm yuklanmoqda...</p>}
+              </label>
+              {inventoryForm.image && (
+                <div className="rounded-3xl overflow-hidden border border-slate-200 bg-slate-50 p-2">
+                  <img src={inventoryForm.image.startsWith('http') ? inventoryForm.image : `http://localhost:3000${inventoryForm.image}`} alt="Preview" className="h-32 w-full object-cover" />
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2">
                 <input className="input rounded-2xl" placeholder="Narx" type="number" value={inventoryForm.price} onChange={(e) => setInventoryForm({ ...inventoryForm, price: e.target.value })} />
                 <input className="input rounded-2xl" placeholder="Soni" type="number" value={inventoryForm.stockQuantity} onChange={(e) => setInventoryForm({ ...inventoryForm, stockQuantity: e.target.value })} />
@@ -379,7 +411,7 @@ function Metric({ label, value, danger, warning }: any) {
   );
 }
 
-function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService, onAcknowledge }: any) {
+function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onReject, onService, onAcknowledge }: any) {
   const runningMinutes = order?.status === 'confirmed' ? minutesSince(order.confirmedAt || order.startAt) : 0;
   const runningCost = order?.status === 'confirmed' ? Math.ceil((runningMinutes / 60) * Number(order.pricePerHour || table.pricePerHour)) + Number(order.total || 0) : 0;
   return (
@@ -387,7 +419,11 @@ function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService
       {alerts.length > 0 && <div className="absolute inset-x-0 top-0 bg-red-600 px-4 py-2 text-sm font-semibold text-white"><BellRing className="mr-2 inline h-4 w-4" />{table.name}: {alerts[0].quantity} ta {alerts[0].extra?.name || alerts[0].name} so‘rayapti</div>}
       <div className={alerts.length ? 'pt-10' : ''}>
         <div className="flex items-start justify-between">
-          <div><h3 className="text-lg font-semibold">{table.name}</h3><p className="text-sm text-slate-500">{table.type?.name || 'Tarifsiz'} · {formatCurrency(Number(table.pricePerHour))}/soat</p></div>
+          <div>
+            <h3 className="text-lg font-semibold">{table.name}</h3>
+            <p className="text-sm text-slate-500">{table.type?.name || 'Tarifsiz'} · {formatCurrency(Number(table.pricePerHour))}/soat</p>
+            {table.type?.details && <p className="text-xs text-slate-400 mt-1">{table.type.details}</p>}
+          </div>
           <span className={`badge ${table.status === 'free' ? 'badge-success' : table.status === 'reserved' ? 'badge-warning' : 'badge-danger'}`}>{table.status === 'free' ? 'Bo‘sh' : table.status === 'reserved' ? 'Kutilmoqda' : 'Band'}</span>
         </div>
         {order ? (
@@ -396,7 +432,12 @@ function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService
               <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800"><Clock size={16} /><p className="mt-1 font-semibold">{order.status === 'confirmed' ? `${runningMinutes} min` : 'Tasdiq kutyapti'}</p></div>
               <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800"><ReceiptText size={16} /><p className="mt-1 font-semibold">{formatCurrency(runningCost)}</p></div>
             </div>
-            {order.status === 'pending' ? <button className="btn-success w-full rounded-2xl" onClick={() => onConfirm(order.id)}><Check size={16} /> Tasdiqlash</button> : (
+            {order.status === 'pending' ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button className="btn-success rounded-2xl" onClick={() => onConfirm(order.id)}><Check size={16} /> Tasdiqlash</button>
+                <button className="btn-danger rounded-2xl" onClick={() => onReject(order.id)}><X size={16} /> Rad etish</button>
+              </div>
+            ) : (
               <div className="grid grid-cols-2 gap-2">
                 <button className="btn-secondary rounded-2xl" onClick={onService}><Plus size={16} /> Xizmat</button>
                 <button className="btn-danger rounded-2xl" onClick={() => onClose(order.id)}><Timer size={16} /> Yopish</button>
@@ -404,7 +445,7 @@ function TableCard({ table, order, alerts, onOpen, onConfirm, onClose, onService
             )}
           </div>
         ) : (
-          <button className="mt-4 h-12 w-full rounded-2xl bg-slate-950 text-sm font-semibold text-white dark:bg-white dark:text-slate-950" onClick={onOpen}>Stolni ochish</button>
+          <button className="mt-4 h-12 w-full rounded-2xl bg-slate-950 text-sm font-semibold text-white dark:bg-white dark:text-slate-950" onClick={onOpen}>Stolni band qilish</button>
         )}
         {alerts.length > 0 && <div className="mt-3 space-y-2">{alerts.map((item: any) => <div key={item.id} className="flex items-center justify-between rounded-2xl bg-red-50 p-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200"><span>{item.quantity} x {item.extra?.name || item.name}</span><button onClick={() => onAcknowledge(item.id)} className="rounded-xl bg-red-600 px-3 py-1 font-semibold text-white">Qabul qildim</button></div>)}</div>}
       </div>
