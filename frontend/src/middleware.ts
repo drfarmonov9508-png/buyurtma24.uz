@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/superadmin/login', '/menu'];
+const PUBLIC_PATHS = ['/login', '/superadmin/login', '/menu', '/scan'];
 const ROLE_ROUTES: Record<string, string[]> = {
   superadmin: ['/superadmin'],
   cafe_admin: ['/admin'],

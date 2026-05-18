@@ -20,6 +20,8 @@ export default function HomePage() {
       case 'waiter': router.replace('/waiter'); break;
       case 'kitchen': router.replace('/kitchen'); break;
       case 'client': router.replace('/client'); break;
+      case 'billiard_admin':
+      case 'sport_admin': router.replace('/billiard-admin'); break;
       default: router.replace('/login');
     }
   }, [isAuthenticated, user, router]);

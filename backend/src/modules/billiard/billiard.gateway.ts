@@ -15,7 +15,9 @@ export class BilliardGateway implements OnGatewayConnection {
 
   handleConnection(client: Socket) {
     const clubId = client.handshake.query.clubId as string;
+    const userId = client.handshake.query.userId as string;
     if (clubId) client.join(`club:${clubId}`);
+    if (userId) client.join(`user:${userId}`);
   }
 
   @SubscribeMessage('join-club')
@@ -24,7 +26,17 @@ export class BilliardGateway implements OnGatewayConnection {
     return { status: 'joined' };
   }
 
+  @SubscribeMessage('join-user')
+  joinUser(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
+    if (data?.userId) client.join(`user:${data.userId}`);
+    return { status: 'joined' };
+  }
+
   emitClub(clubId: string, event: string, payload: any) {
     this.server.to(`club:${clubId}`).emit(event, payload);
+  }
+
+  emitUser(userId: string, event: string, payload: any) {
+    this.server.to(`user:${userId}`).emit(event, payload);
   }
 }

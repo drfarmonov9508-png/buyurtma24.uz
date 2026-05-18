@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { BilliardClub } from './billiard-club.entity';
 import { BilliardTableType } from './billiard-table-type.entity';
@@ -37,4 +37,8 @@ export class BilliardTable extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Index({ unique: true })
+  @Column({ length: 64, nullable: true })
+  qrToken: string;
 }

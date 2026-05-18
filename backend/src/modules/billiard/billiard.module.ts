@@ -9,9 +9,14 @@ import { BilliardTableType } from './billiard-table-type.entity';
 import { BilliardExtra } from './billiard-extra.entity';
 import { BilliardOrderItem } from './billiard-order-item.entity';
 import { BilliardGateway } from './billiard.gateway';
+import { AuthModule } from '../auth/auth.module';
+import { AuthService } from '../auth/auth.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BilliardClub, BilliardTable, BilliardOrder, BilliardTableType, BilliardExtra, BilliardOrderItem])],
+  imports: [
+    TypeOrmModule.forFeature([BilliardClub, BilliardTable, BilliardOrder, BilliardTableType, BilliardExtra, BilliardOrderItem]),
+    AuthModule,
+  ],
   providers: [BilliardService, BilliardGateway],
   controllers: [BilliardController],
   exports: [BilliardService],
